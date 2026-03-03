@@ -17,6 +17,7 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
+        // dd('UserController index method called', $request->all());
         $users = User::with('roles', 'permissions')
             ->when($request->search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
@@ -176,11 +177,22 @@ class UserController extends Controller
      */
     public function toggleStatus(User $user)
     {
-        // You'll need to add an 'is_active' column to users table
-        $user->update([
-            'is_active' => !$user->is_active
-        ]);
+        try {
+            // Prevent toggling your own status
+            if ($user->id === auth()->id()) {
+                return back()->with('error', 'You cannot change your own status.');
+            }
 
-        return back()->with('success', 'User status updated successfully.');
+            $user->update([
+                'is_active' => !$user->is_active
+            ]);
+
+            $status = $user->is_active ? 'activated' : 'deactivated';
+
+            return back()->with('success', "User {$status} successfully.");
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to toggle user status.');
+        }
     }
+
 }

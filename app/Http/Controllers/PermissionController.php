@@ -12,12 +12,17 @@ class PermissionController extends Controller
     /**
      * Display a listing of permissions.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $permissions = Permission::with('roles')->get();
+        $permissions = Permission::query()
+            ->when($request->search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
+            ->paginate(10);
 
         return Inertia::render('Permissions/Index', [
             'permissions' => $permissions,
+            'filters' => $request->only(['search']),
             'roles' => Role::all(),
         ]);
     }
@@ -29,16 +34,16 @@ class PermissionController extends Controller
     {
         $request->validate([
             'name' => 'required|string|unique:permissions,name',
-            'roles' => 'array',
+            'guard_name' => 'sometimes|string'
         ]);
 
-        $permission = Permission::create(['name' => $request->name]);
+        Permission::create([
+            'name' => $request->name,
+            'guard_name' => $request->guard_name ?? 'web'
+        ]);
 
-        if ($request->has('roles')) {
-            $permission->syncRoles($request->roles);
-        }
-
-        return back()->with('success', 'Permission created successfully.');
+        return redirect()->route('permissions.index')
+            ->with('success', 'Permission created successfully.');
     }
 
     /**
@@ -48,16 +53,16 @@ class PermissionController extends Controller
     {
         $request->validate([
             'name' => 'required|string|unique:permissions,name,' . $permission->id,
-            'roles' => 'array',
+            'guard_name' => 'sometimes|string'
         ]);
 
-        $permission->update(['name' => $request->name]);
+        $permission->update([
+            'name' => $request->name,
+            'guard_name' => $request->guard_name ?? $permission->guard_name
+        ]);
 
-        if ($request->has('roles')) {
-            $permission->syncRoles($request->roles);
-        }
-
-        return back()->with('success', 'Permission updated successfully.');
+        return redirect()->route('permissions.index')
+            ->with('success', 'Permission updated successfully.');
     }
 
     /**
@@ -67,7 +72,8 @@ class PermissionController extends Controller
     {
         $permission->delete();
 
-        return back()->with('success', 'Permission deleted successfully.');
+        return redirect()->route('permissions.index')
+            ->with('success', 'Permission deleted successfully.');
     }
 
     /**
@@ -76,10 +82,11 @@ class PermissionController extends Controller
     public function assignToRole(Request $request, Permission $permission)
     {
         $request->validate([
-            'role' => 'required|exists:roles,name',
+            'role' => 'required|exists:roles,name'
         ]);
 
-        $permission->assignRole($request->role);
+        $role = Role::findByName($request->role);
+        $role->givePermissionTo($permission);
 
         return back()->with('success', 'Permission assigned to role successfully.');
     }
@@ -90,10 +97,11 @@ class PermissionController extends Controller
     public function removeFromRole(Request $request, Permission $permission)
     {
         $request->validate([
-            'role' => 'required|exists:roles,name',
+            'role' => 'required|exists:roles,name'
         ]);
 
-        $permission->removeRole($request->role);
+        $role = Role::findByName($request->role);
+        $role->revokePermissionTo($permission);
 
         return back()->with('success', 'Permission removed from role successfully.');
     }

@@ -12,12 +12,17 @@ class RoleController extends Controller
     /**
      * Display a listing of roles.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $roles = Role::with('permissions')->get();
+        $roles = Role::with('permissions')
+            ->when($request->search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
+            ->paginate(10); // Changed from get() to paginate()
 
         return Inertia::render('Roles/Index', [
-            'roles' => $roles,
+            'roles' => $roles, // This will now have the correct structure with data, links, etc.
+            'filters' => $request->only(['search']),
             'permissions' => Permission::all(),
         ]);
     }
@@ -38,7 +43,8 @@ class RoleController extends Controller
             $role->syncPermissions($request->permissions);
         }
 
-        return back()->with('success', 'Role created successfully.');
+        return redirect()->route('roles.index')
+            ->with('success', 'Role created successfully.');
     }
 
     /**
@@ -57,7 +63,8 @@ class RoleController extends Controller
             $role->syncPermissions($request->permissions);
         }
 
-        return back()->with('success', 'Role updated successfully.');
+        return redirect()->route('roles.index')
+            ->with('success', 'Role updated successfully.');
     }
 
     /**
@@ -66,12 +73,13 @@ class RoleController extends Controller
     public function destroy(Role $role)
     {
         // Prevent deleting super-admin role
-        if ($role->name === 'super-admin') {
-            return back()->with('error', 'Cannot delete super-admin role.');
+        if ($role->name === 'super-admin' || $role->name === 'admin') {
+            return back()->with('error', 'Cannot delete system roles.');
         }
 
         $role->delete();
 
-        return back()->with('success', 'Role deleted successfully.');
+        return redirect()->route('roles.index')
+            ->with('success', 'Role deleted successfully.');
     }
 }

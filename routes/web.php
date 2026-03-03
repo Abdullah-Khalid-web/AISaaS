@@ -33,7 +33,6 @@ Route::get('/contact', function () {
 
 // Authenticated routes (require login)
 Route::middleware('auth')->group(function () {
-
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -61,22 +60,26 @@ Route::middleware('auth')->group(function () {
     Route::get('/api-tokens', function () {
         return Inertia::render('ApiTokens');
     })->name('api-tokens.index');
+});
 
-    // User Management Routes (Admin only - add middleware later)
-    Route::middleware(['role:admin|super-admin'])->group(function () {
-        Route::resource('users', UserController::class);
-        Route::post('users/password/{user}', [UserController::class, 'updatePassword'])->name('users.password');
-        Route::post('users/bulk-delete', [UserController::class, 'bulkDestroy'])->name('users.bulk-destroy');
-        Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+// Admin routes (separate group with both auth and role middleware)
+Route::middleware(['auth', 'role:admin|super-admin'])->group(function () {
+    // User Management Routes
+    Route::resource('users', UserController::class);
+    Route::post('users/password/{user}', [UserController::class, 'updatePassword'])->name('users.password');
+    Route::post('users/bulk-delete', [UserController::class, 'bulkDestroy'])->name('users.bulk-destroy');
+    Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
 
-        // Role Management Routes
-        Route::resource('roles', RoleController::class);
+    // Role Management Routes
+    Route::resource('roles', RoleController::class);
+    Route::post('roles/password/{role}', [RoleController::class, 'updatePassword'])->name('roles.password');
+    Route::post('roles/bulk-delete', [RoleController::class, 'bulkDestroy'])->name('roles.bulk-destroy');
+    Route::post('roles/{role}/toggle-status', [RoleController::class, 'toggleStatus'])->name('roles.toggle-status');
 
-        // Permission Management Routes
-        Route::resource('permissions', PermissionController::class);
-        Route::post('permissions/{permission}/assign-to-role', [PermissionController::class, 'assignToRole'])->name('permissions.assign-to-role');
-        Route::delete('permissions/{permission}/remove-from-role', [PermissionController::class, 'removeFromRole'])->name('permissions.remove-from-role');
-    });
+    // Permission Management Routes
+    Route::resource('permissions', PermissionController::class);
+    Route::post('permissions/{permission}/assign-to-role', [PermissionController::class, 'assignToRole'])->name('permissions.assign-to-role');
+    Route::delete('permissions/{permission}/remove-from-role', [PermissionController::class, 'removeFromRole'])->name('permissions.remove-from-role');
 });
 
 // Auth routes (login, register, etc.)
