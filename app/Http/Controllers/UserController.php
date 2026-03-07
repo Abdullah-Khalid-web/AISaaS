@@ -17,6 +17,7 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
+        // dd(auth()->user()->hasRole('super-admin'));
         // dd('UserController index method called', $request->all());
         $users = User::with('roles', 'permissions')
             ->when($request->search, function ($query, $search) {

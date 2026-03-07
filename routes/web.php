@@ -5,7 +5,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
-use App\Http\Controllers\AIToolController;
+use App\Http\Controllers\AI\LicenseController;
+use App\Http\Controllers\AI\PlanController;
+use App\Http\Controllers\AI\AIToolController;
+use App\Http\Controllers\AI\SubscriptionController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -19,10 +22,6 @@ Route::get('/features', function () {
     return Inertia::render('Features');
 })->name('features');
 
-Route::get('/pricing', function () {
-    return Inertia::render('Pricing');
-})->name('pricing');
-
 Route::get('/about', function () {
     return Inertia::render('About');
 })->name('about');
@@ -30,6 +29,8 @@ Route::get('/about', function () {
 Route::get('/contact', function () {
     return Inertia::render('Contact');
 })->name('contact');
+
+Route::get('/pricing', [PlanController::class, 'publicPricing'])->name('pricing');
 
 // Authenticated routes (require login)
 Route::middleware('auth')->group(function () {
@@ -40,16 +41,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-
-    // AI Tools routes
-    Route::prefix('tools')->name('tools.')->group(function () {
-        Route::get('/', [AIToolController::class, 'index'])->name('index');
-        Route::get('/text-generator', [AIToolController::class, 'textGenerator'])->name('text-generator');
-        Route::get('/image-generator', [AIToolController::class, 'imageGenerator'])->name('image-generator');
-        Route::get('/code-assistant', [AIToolController::class, 'codeAssistant'])->name('code-assistant');
-        Route::get('/chat-bot', [AIToolController::class, 'chatBot'])->name('chat-bot');
-        Route::get('/analytics', [AIToolController::class, 'analytics'])->name('analytics');
-    });
 
     // Billing routes
     Route::get('/billing', function () {
@@ -63,7 +54,7 @@ Route::middleware('auth')->group(function () {
 });
 
 // Admin routes (separate group with both auth and role middleware)
-Route::middleware(['auth', 'role:admin|super-admin'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     // User Management Routes
     Route::resource('users', UserController::class);
     Route::post('users/password/{user}', [UserController::class, 'updatePassword'])->name('users.password');
@@ -72,14 +63,28 @@ Route::middleware(['auth', 'role:admin|super-admin'])->group(function () {
 
     // Role Management Routes
     Route::resource('roles', RoleController::class);
-    Route::post('roles/password/{role}', [RoleController::class, 'updatePassword'])->name('roles.password');
-    Route::post('roles/bulk-delete', [RoleController::class, 'bulkDestroy'])->name('roles.bulk-destroy');
-    Route::post('roles/{role}/toggle-status', [RoleController::class, 'toggleStatus'])->name('roles.toggle-status');
 
     // Permission Management Routes
     Route::resource('permissions', PermissionController::class);
     Route::post('permissions/{permission}/assign-to-role', [PermissionController::class, 'assignToRole'])->name('permissions.assign-to-role');
     Route::delete('permissions/{permission}/remove-from-role', [PermissionController::class, 'removeFromRole'])->name('permissions.remove-from-role');
+
+    // Plan Management
+    Route::resource('plans', PlanController::class);
+    Route::post('plans/{plan}/toggle-status', [PlanController::class, 'toggleStatus'])->name('plans.toggle-status');
+
+    // Tool Management
+    Route::resource('tools', AIToolController::class);
+    Route::post('tools/{tool}/toggle-status', [AIToolController::class, 'toggleStatus'])->name('tools.toggle-status');
+
+    // Subscription Management
+    Route::resource('subscriptions', SubscriptionController::class);
+    Route::post('subscriptions/{subscription}/toggle-status', [SubscriptionController::class, 'toggleStatus'])->name('subscriptions.toggle-status');
+
+    // License Management
+    // Route::resource('licenses', LicenseController::class);
+    // Route::post('licenses/{license}/toggle-status', [LicenseController::class, 'toggleStatus'])->name('licenses.toggle-status');
+
 });
 
 // Auth routes (login, register, etc.)

@@ -1,3 +1,4 @@
+<!-- resources/js/Layouts/Header.vue -->
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
@@ -18,8 +19,18 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle-sidebar']);
 
-const user = computed(() => usePage().props.auth?.user);
+const page = usePage();
+const user = computed(() => page.props.auth?.user);
 const showingNavigationDropdown = ref(false);
+
+// Check if routes exist
+const hasBillingRoute = computed(() => {
+    return page.props.routes?.billing || false;
+});
+
+const hasApiTokensRoute = computed(() => {
+    return page.props.routes?.['api-tokens.index'] || false;
+});
 </script>
 
 <template>
@@ -77,8 +88,13 @@ const showingNavigationDropdown = ref(false);
                             <template #content>
                                 <DropdownLink :href="route('profile.edit')">Profile</DropdownLink>
                                 <DropdownLink :href="route('dashboard')">Dashboard</DropdownLink>
-                                <DropdownLink :href="route('billing')">Billing</DropdownLink>
-                                <DropdownLink :href="route('api-tokens.index')">API Tokens</DropdownLink>
+
+                                <!-- Only show billing if route exists -->
+                                <DropdownLink v-if="hasBillingRoute" :href="route('billing')">Billing</DropdownLink>
+
+                                <!-- Only show API tokens if route exists -->
+                                <DropdownLink v-if="hasApiTokensRoute" :href="route('api-tokens.index')">API Tokens</DropdownLink>
+
                                 <div class="border-t border-gray-200"></div>
                                 <DropdownLink :href="route('logout')" method="post" as="button">Logout</DropdownLink>
                             </template>
@@ -128,8 +144,8 @@ const showingNavigationDropdown = ref(false);
                     <div class="mt-3 space-y-1">
                         <ResponsiveNavLink :href="route('profile.edit')">Profile</ResponsiveNavLink>
                         <ResponsiveNavLink :href="route('dashboard')">Dashboard</ResponsiveNavLink>
-                        <ResponsiveNavLink :href="route('billing')">Billing</ResponsiveNavLink>
-                        <ResponsiveNavLink :href="route('api-tokens.index')">API Tokens</ResponsiveNavLink>
+                        <ResponsiveNavLink v-if="hasBillingRoute" :href="route('billing')">Billing</ResponsiveNavLink>
+                        <ResponsiveNavLink v-if="hasApiTokensRoute" :href="route('api-tokens.index')">API Tokens</ResponsiveNavLink>
                         <ResponsiveNavLink :href="route('logout')" method="post" as="button">
                             Logout
                         </ResponsiveNavLink>
