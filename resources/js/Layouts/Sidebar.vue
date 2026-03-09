@@ -1,20 +1,42 @@
 <!-- resources/js/Layouts/Sidebar.vue -->
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 
 const isOpen = ref(true);
 const isUserMenuOpen = ref(false);
-const isPlanMenuOpen = ref(false); // Add this line
-const isToolMenuOpen = ref(false); // Add this line
-const isSubscriptionsMenuOpen = ref(false); // Add this line
+const isPlanMenuOpen = ref(false);
+const isToolMenuOpen = ref(false);
+const isSubscriptionsMenuOpen = ref(false);
+const isRolesMenuOpen = ref(false);
+const isPermissionsMenuOpen = ref(false);
+
+// Get the current user's permissions from the page props
+const page = usePage();
+const userPermissions = computed(() => page.props.auth?.user?.permissions || []);
+const userRoles = computed(() => page.props.auth?.user?.roles || []);
+
+// Permission check function
+const can = (permission) => {
+    if (!permission) return true;
+    if (Array.isArray(permission)) {
+        return permission.some(p => userPermissions.value.includes(p));
+    }
+    return userPermissions.value.includes(permission);
+};
+
+// Check if user has any of the given permissions
+const canAny = (permissions) => {
+    return permissions.some(p => userPermissions.value.includes(p));
+};
 
 const tools = [
-    { name: 'Text Generator', icon: 'M4 6h16M4 12h16M4 18h7', route: 'tools.text-generator' },
-    { name: 'Image Generator', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', route: 'tools.image-generator' },
-    { name: 'Code Assistant', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4', route: 'tools.code-assistant' },
-    { name: 'Chat Bot', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', route: 'tools.chat-bot' },
-    { name: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', route: 'tools.analytics' },
+    { name: 'Text Generator', icon: 'M4 6h16M4 12h16M4 18h7', route: 'tools.text-generator', permission: 'use text generator' },
+    { name: 'Image Generator', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', route: 'tools.image-generator', permission: 'use image generator' },
+    { name: 'Code Assistant', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4', route: 'tools.code-assistant', permission: 'use code assistant' },
+    { name: 'Chat Bot', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', route: 'tools.chat-bot', permission: 'use chat bot' },
+    { name: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', route: 'tools.analytics', permission: 'view analytics' },
 ];
 </script>
 
@@ -43,7 +65,7 @@ const tools = [
 
         <!-- Navigation -->
         <nav class="mt-5 px-2 pb-20">
-            <!-- Dashboard -->
+            <!-- Dashboard (always visible) -->
             <Link
                 href="/dashboard"
                 class="flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white group mb-1"
@@ -58,8 +80,8 @@ const tools = [
                 </div>
             </Link>
 
-            <!-- User Management -->
-            <div class="mt-2">
+            <!-- User Management - Only if user has user management permissions -->
+            <div v-if="canAny(['view users', 'create users', 'edit users', 'delete users'])" class="mt-2">
                 <!-- Expanded state -->
                 <div v-if="isOpen">
                     <button
@@ -77,25 +99,24 @@ const tools = [
                         </svg>
                     </button>
 
-                    <!-- Dropdown Menu -->
+                    <!-- Dropdown Menu with permission checks -->
                     <div v-show="isUserMenuOpen" class="mt-1 space-y-1 pl-11">
+                        <!-- View Users Link -->
                         <Link
+                            v-if="can('view users')"
                             href="/users"
                             class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
                         >
-                            Users
+                            View Users
                         </Link>
+
+                        <!-- Create User Link -->
                         <Link
-                            href="/permissions"
+                            v-if="can('create users')"
+                            href="/users/create"
                             class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
                         >
-                            Permissions
-                        </Link>
-                        <Link
-                            href="/roles"
-                            class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
-                        >
-                            Roles
+                            Create User
                         </Link>
                     </div>
                 </div>
@@ -113,8 +134,59 @@ const tools = [
                 </div>
             </div>
 
-            <!-- Plan Management -->
-            <div class="mt-2">
+            <!-- Roles & Permissions Management -->
+            <div v-if="canAny(['view roles', 'create roles', 'edit roles', 'delete roles', 'view permissions'])" class="mt-2">
+                <!-- Expanded state -->
+                <div v-if="isOpen">
+                    <button
+                        @click="isRolesMenuOpen = !isRolesMenuOpen"
+                        class="w-full flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white group"
+                    >
+                        <div class="flex items-center">
+                            <svg class="mr-3 h-6 w-6 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                            </svg>
+                            <span>Roles & Permissions</span>
+                        </div>
+                        <svg class="h-5 w-5 transition-transform duration-200" :class="{ 'rotate-180': isRolesMenuOpen }" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+
+                    <!-- Dropdown Menu -->
+                    <div v-show="isRolesMenuOpen" class="mt-1 space-y-1 pl-11">
+                        <Link
+                            v-if="can('view roles')"
+                            href="/roles"
+                            class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
+                        >
+                            View Roles
+                        </Link>
+                        <Link
+                            v-if="can('view permissions')"
+                            href="/permissions"
+                            class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
+                        >
+                            View Permissions
+                        </Link>
+                    </div>
+                </div>
+
+                <!-- Collapsed state -->
+                <div v-else class="relative group">
+                    <button class="w-full flex justify-center px-2 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md">
+                        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                    </button>
+                    <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
+                        Roles & Permissions
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plan Management - Only if user has plan permissions -->
+            <div v-if="canAny(['view plans', 'create plans', 'edit plans', 'delete plans'])" class="mt-2">
                 <!-- Expanded state -->
                 <div v-if="isOpen">
                     <button
@@ -135,12 +207,14 @@ const tools = [
                     <!-- Dropdown Menu -->
                     <div v-show="isPlanMenuOpen" class="mt-1 space-y-1 pl-11">
                         <Link
+                            v-if="can('view plans')"
                             href="/plans"
                             class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
                         >
                             View Plans
                         </Link>
                         <Link
+                            v-if="can('create plans')"
                             :href="route('plans.create')"
                             class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
                         >
@@ -162,8 +236,8 @@ const tools = [
                 </div>
             </div>
 
-            <!-- Tool Management -->
-            <div class="mt-2">
+            <!-- Tool Management - Only if user has tool permissions -->
+            <div v-if="canAny(['view tools', 'create tools', 'edit tools', 'delete tools'])" class="mt-2">
                 <!-- Expanded state -->
                 <div v-if="isOpen">
                     <button
@@ -190,6 +264,7 @@ const tools = [
                             View Tools
                         </Link>
                         <Link
+                            v-if="can('create tools')"
                             :href="route('tools.create')"
                             class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
                         >
@@ -211,8 +286,8 @@ const tools = [
                 </div>
             </div>
 
-            <!-- Subscription Management -->
-            <div class="mt-2">
+            <!-- Subscription Management - Only if user has subscription permissions -->
+            <div v-if="canAny(['view subscriptions', 'create subscriptions', 'edit subscriptions'])" class="mt-2">
                 <!-- Expanded state -->
                 <div v-if="isOpen">
                     <button
@@ -221,7 +296,7 @@ const tools = [
                     >
                         <div class="flex items-center">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                             </svg>
                             <span>Subscription Management</span>
                         </div>
@@ -233,17 +308,12 @@ const tools = [
                     <!-- Dropdown Menu -->
                     <div v-show="isSubscriptionsMenuOpen" class="mt-1 space-y-1 pl-11">
                         <Link
+                            v-if="can('view subscriptions')"
                             href="/subscriptions"
                             class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
                         >
                             View Subscriptions
                         </Link>
-                        <!-- <Link
-                            :href="route('subscriptions.create')"
-                            class="block px-2 py-2 text-sm text-gray-400 hover:bg-gray-700 hover:text-white rounded-md"
-                        >
-                            Create Subscription
-                        </Link> -->
                     </div>
                 </div>
 
@@ -251,7 +321,7 @@ const tools = [
                 <div v-else class="relative group">
                     <button class="w-full flex justify-center px-2 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md">
                         <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                         </svg>
                     </button>
                     <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
@@ -260,14 +330,14 @@ const tools = [
                 </div>
             </div>
 
-            <!-- Tools Section -->
+            <!-- Tools Section - Only show tools user has permission to use -->
             <div class="mt-4 pt-4 border-t border-gray-700">
                 <h3 v-if="isOpen" class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                     AI Tools
                 </h3>
                 <div class="space-y-1">
                     <Link
-                        v-for="tool in tools"
+                        v-for="tool in tools.filter(t => can(t.permission))"
                         :key="tool.name"
                         :href="'/' + tool.route.split('.')[0]"
                         class="flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white group"
@@ -284,8 +354,8 @@ const tools = [
                 </div>
             </div>
 
-            <!-- Usage Stats -->
-            <div v-if="isOpen" class="mt-4 pt-4 border-t border-gray-700">
+            <!-- Usage Stats - Show based on permission -->
+            <div v-if="isOpen && can('view usage stats')" class="mt-4 pt-4 border-t border-gray-700">
                 <h3 class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Usage</h3>
                 <div class="mt-2 px-3">
                     <div class="flex justify-between text-xs">

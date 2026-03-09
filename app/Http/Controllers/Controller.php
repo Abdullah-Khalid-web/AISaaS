@@ -10,7 +10,21 @@ use Illuminate\Routing\Controller as BaseController;
 abstract class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
+    protected function authorizePermission($permission)
+    {
+        if (!auth()->user()->can($permission)) {
+            abort(403, 'Unauthorized action.');
+        }
+    }
 
-    // If you want to define a base index method
-    // public function index() {}
+    protected function authorizeAnyPermission($permissions)
+    {
+        foreach ($permissions as $permission) {
+            if (auth()->user()->can($permission)) {
+                return true;
+            }
+        }
+        abort(403, 'Unauthorized action.');
+    }
 }
+

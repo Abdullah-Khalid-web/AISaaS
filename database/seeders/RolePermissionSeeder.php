@@ -66,6 +66,10 @@ class RolePermissionSeeder extends Seeder
             'create content',
             'edit content',
             'delete content',
+
+            'create plans',
+            'edit plans',
+            'delete plans'
         ];
 
         foreach ($permissions as $permission) {
@@ -99,6 +103,10 @@ class RolePermissionSeeder extends Seeder
             'view content',
             'create content',
             'edit content',
+            'delete content',
+            'create plans',
+            'edit plans',
+            'delete plans',
         ]);
 
         // Assign permissions to manager
