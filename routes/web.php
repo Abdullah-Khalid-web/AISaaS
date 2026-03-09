@@ -51,15 +51,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/api-tokens', function () {
         return Inertia::render('ApiTokens');
     })->name('api-tokens.index');
-});
 
-// Admin routes (separate group with both auth and role middleware)
-Route::middleware(['auth'])->group(function () {
     // User Management Routes
     Route::resource('users', UserController::class);
     Route::post('users/password/{user}', [UserController::class, 'updatePassword'])->name('users.password');
     Route::post('users/bulk-delete', [UserController::class, 'bulkDestroy'])->name('users.bulk-destroy');
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    
 
     // Role Management Routes
     Route::resource('roles', RoleController::class);
