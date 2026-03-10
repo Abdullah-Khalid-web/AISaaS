@@ -9,14 +9,17 @@ use App\Http\Controllers\AI\LicenseController;
 use App\Http\Controllers\AI\PlanController;
 use App\Http\Controllers\AI\AIToolController;
 use App\Http\Controllers\AI\SubscriptionController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\AllToolsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+
+
 // Public routes (no auth required)
-Route::get('/', function () {
-    return Inertia::render('Home');
-})->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/Alltools', [AllToolsController::class, 'index'])->name('tools.public');
 
 Route::get('/features', function () {
     return Inertia::render('Features');
