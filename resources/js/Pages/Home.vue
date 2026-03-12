@@ -242,11 +242,20 @@ const formatNumber = (num) => {
                         </ul>
 
                         <!-- CTA Button -->
-                        <Link v-if="plan.billing_cycle !== 'lifetime' || plan.billing_cycle !== 'one_time'"
+                        <!-- <Link v-if="plan.billing_cycle !== 'lifetime' || plan.billing_cycle !== 'one_time'"
                               :href="route('subscriptions.show', plan.tool_id)"
                               class="block text-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition"
                               :class="{ 'bg-indigo-600': plan.is_popular }">
                             Get Started
+                        </Link> -->
+                        <!-- resources/js/Pages/Home.vue - Update the CTA button link -->
+
+                        <!-- In the pricing section, update this: -->
+                        <Link v-if="plan.billing_cycle !== 'lifetime' || plan.billing_cycle !== 'one_time'"
+                            :href="route('plans.show', plan.id)"
+                            class="block text-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition"
+                            :class="{ 'bg-indigo-600': plan.is_popular }">
+                            View Plan
                         </Link>
                         <Link v-else
                               :href="route('contact')"

@@ -25,15 +25,6 @@ class PlanController extends Controller
         ]);
     }
 
-    public function show(Plan $plan)
-    {
-        $plan->load('tool');
-
-        return Inertia::render('Plans/Show', [
-            'plan' => $plan
-        ]);
-    }
-
     public function publicPricing()
     {
         $tools = AiTool::with(['plans' => function($query) {
@@ -140,5 +131,42 @@ class PlanController extends Controller
 
         return redirect()->route('plans.index')
             ->with('success', 'Plan deleted successfully.');
+    }
+
+
+    public function show(Plan $plan)
+    {
+        $plan->load(['tool' => function($query) {
+            $query->withCount('plans');
+        }]);
+
+        return Inertia::render('Plans/Show', [
+            'plan' => [
+                'id' => $plan->id,
+                'name' => $plan->name,
+                'description' => $plan->description,
+                'price' => $plan->price,
+                'currency' => $plan->currency,
+                'billing_cycle' => $plan->billing_cycle,
+                'duration_days' => $plan->duration_days,
+                'device_limit' => $plan->device_limit,
+                'api_call_limit' => $plan->api_call_limit,
+                'concurrent_users' => $plan->concurrent_users,
+                'features' => $plan->features ?? [],
+                'limitations' => $plan->limitations ?? [],
+                'is_popular' => $plan->is_popular,
+                'is_active' => $plan->is_active,
+                'metadata' => $plan->metadata ?? [],
+                'tool_id' => $plan->tool_id,
+                'tool' => $plan->tool ? [
+                    'id' => $plan->tool->id,
+                    'name' => $plan->tool->name,
+                    'description' => $plan->tool->description,
+                    'version' => $plan->tool->version,
+                    'metadata' => $plan->tool->metadata ?? [],
+                    'plans_count' => $plan->tool->plans_count ?? 0
+                ] : null
+            ]
+        ]);
     }
 }

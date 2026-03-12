@@ -139,9 +139,7 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    /**
-     * Show the subscription form for a specific tool
-     */
+    // Add this method to show the subscription form
     public function show(AiTool $tool)
     {
         // Check if user already has active license
@@ -159,14 +157,31 @@ class SubscriptionController extends Controller
             $query->where('is_active', true)->orderBy('price');
         }]);
 
-        return Inertia::render('Subscriptions/Create', [
-            'tool' => $tool
+        return Inertia::render('Subscriptions/Subscribe', [
+            'tool' => [
+                'id' => $tool->id,
+                'name' => $tool->name,
+                'description' => $tool->description,
+                'metadata' => $tool->metadata ?? [],
+                'plans' => $tool->plans->map(function ($plan) {
+                    return [
+                        'id' => $plan->id,
+                        'name' => $plan->name,
+                        'price' => $plan->price,
+                        'currency' => $plan->currency,
+                        'billing_cycle' => $plan->billing_cycle,
+                        'is_popular' => $plan->is_popular,
+                        'description' => $plan->description,
+                        'features' => $plan->features ?? [],
+                        'api_call_limit' => $plan->api_call_limit,
+                        'device_limit' => $plan->device_limit,
+                    ];
+                })
+            ]
         ]);
     }
 
-    /**
-     * Store a new subscription
-     */
+    // Update the store method to return license ID
     public function store(Request $request, AiTool $tool)
     {
         $request->validate([
@@ -212,11 +227,7 @@ class SubscriptionController extends Controller
             }
 
             // Generate license key
-            $licenseKey = $this->licenseService->generateLicenseKey(
-                Auth::id(),
-                $tool->id,
-                $request->package_name ?? $plan->name
-            );
+            $licenseKey = 'LIC-' . strtoupper(uniqid()) . '-' . str_pad(Auth::id(), 4, '0', STR_PAD_LEFT);
 
             // Create license
             $license = License::create([
@@ -224,7 +235,7 @@ class SubscriptionController extends Controller
                 'tool_id' => $tool->id,
                 'plan_id' => $plan->id,
                 'license_key' => $licenseKey,
-                'package_name' => $request->package_name,
+                'package_name' => $request->package_name ?? $plan->name,
                 'expires_at' => $expiresAt,
                 'status' => 'active',
                 'api_calls_limit' => $plan->api_call_limit,
@@ -244,7 +255,7 @@ class SubscriptionController extends Controller
                 'currency' => $plan->currency,
                 'payment_method' => $request->payment_method,
                 'payment_gateway' => $request->payment_method,
-                'transaction_id' => strtoupper($request->payment_method) . '_' . uniqid(),
+                'transaction_id' => 'TXN_' . strtoupper(uniqid()),
                 'status' => 'completed',
                 'paid_at' => now(),
                 'metadata' => [
@@ -255,13 +266,13 @@ class SubscriptionController extends Controller
 
             DB::commit();
 
+            // Redirect to the license view page
             return redirect()->route('licenses.show', $license)
                 ->with('success', 'Successfully subscribed to ' . $tool->name . '! Your license key has been generated.');
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            // Log error
             \Log::error('Subscription failed: ' . $e->getMessage(), [
                 'user_id' => Auth::id(),
                 'tool_id' => $tool->id,
@@ -272,6 +283,71 @@ class SubscriptionController extends Controller
                 'error' => 'Failed to process subscription: ' . $e->getMessage()
             ]);
         }
+    }
+
+    // Add showLicense method (if not already present)
+    public function showLicense(License $license)
+    {
+        // Check authorization
+        if (Auth::id() !== $license->user_id && !Auth::user()->hasAnyRole(['admin', 'super-admin'])) {
+            abort(403);
+        }
+
+        $license->load(['user', 'tool', 'plan', 'payments' => function($query) {
+            $query->latest();
+        }]);
+
+        return Inertia::render('Licenses/Show', [
+            'license' => [
+                'id' => $license->id,
+                'license_key' => $license->license_key,
+                'package_name' => $license->package_name,
+                'status' => $license->status,
+                'expires_at' => $license->expires_at,
+                'api_calls_used' => $license->api_calls_used,
+                'api_calls_limit' => $license->api_calls_limit,
+                'device_count' => $license->device_count,
+                'device_limit' => $license->device_limit,
+                'device_ids' => $license->device_ids,
+                'allowed_domains' => $license->allowed_domains,
+                'auto_renew' => $license->auto_renew,
+                'is_trial' => $license->is_trial,
+                'created_at' => $license->created_at,
+                'metadata' => $license->metadata,
+                'isExpired' => $license->isExpired(),
+                'user' => $license->user ? [
+                    'id' => $license->user->id,
+                    'name' => $license->user->name,
+                    'email' => $license->user->email
+                ] : null,
+                'tool' => $license->tool ? [
+                    'id' => $license->tool->id,
+                    'name' => $license->tool->name,
+                    'version' => $license->tool->version,
+                    'metadata' => $license->tool->metadata
+                ] : null,
+                'plan' => $license->plan ? [
+                    'id' => $license->plan->id,
+                    'name' => $license->plan->name,
+                    'price' => $license->plan->price,
+                    'currency' => $license->plan->currency,
+                    'billing_cycle' => $license->plan->billing_cycle,
+                    'features' => $license->plan->features
+                ] : null,
+                'payments' => $license->payments->map(function ($payment) {
+                    return [
+                        'id' => $payment->id,
+                        'transaction_id' => $payment->transaction_id,
+                        'amount' => $payment->amount,
+                        'currency' => $payment->currency,
+                        'payment_method' => $payment->payment_method,
+                        'status' => $payment->status,
+                        'paid_at' => $payment->paid_at
+                    ];
+                })
+            ],
+            'isAdmin' => Auth::user()->hasAnyRole(['admin', 'super-admin'])
+        ]);
     }
 
     /**
@@ -567,4 +643,46 @@ class SubscriptionController extends Controller
         return redirect()->route('subscriptions.index')
             ->with('success', 'Subscription cancelled successfully.');
     }
+
+    public function subscribe(AiTool $tool)
+    {
+        // Check if user already has active license
+        $existingLicense = License::where('user_id', Auth::id())
+            ->where('tool_id', $tool->id)
+            ->where('status', 'active')
+            ->first();
+
+        if ($existingLicense) {
+            return redirect()->route('licenses.show', $existingLicense)
+                ->with('error', 'You already have an active license for this tool.');
+        }
+
+        $tool->load(['plans' => function($query) {
+            $query->where('is_active', true)->orderBy('price');
+        }]);
+
+        return Inertia::render('Subscriptions/Subscribe', [
+            'tool' => [
+                'id' => $tool->id,
+                'name' => $tool->name,
+                'description' => $tool->description,
+                'metadata' => $tool->metadata ?? [],
+                'plans' => $tool->plans->map(function ($plan) {
+                    return [
+                        'id' => $plan->id,
+                        'name' => $plan->name,
+                        'price' => $plan->price,
+                        'currency' => $plan->currency,
+                        'billing_cycle' => $plan->billing_cycle,
+                        'is_popular' => $plan->is_popular,
+                        'description' => $plan->description,
+                        'features' => $plan->features ?? [],
+                        'api_call_limit' => $plan->api_call_limit,
+                        'device_limit' => $plan->device_limit,
+                    ];
+                })
+            ]
+        ]);
+    }
+
 }

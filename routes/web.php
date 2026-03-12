@@ -1,4 +1,5 @@
 <?php
+// routes/web.php
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
@@ -15,11 +16,10 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-
-
 // Public routes (no auth required)
 Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::get('/Alltools', [AllToolsController::class, 'index'])->name('tools.public');
+Route::get('/Alltools', [AllToolsController::class, 'index'])->name('Alltools.public');
+Route::get('/Alltools/{tool}', [AllToolsController::class, 'show'])->name('Alltools.show');
 
 Route::get('/features', function () {
     return Inertia::render('Features');
@@ -120,6 +120,7 @@ Route::middleware('auth')->group(function () {
     // Plan Management
     Route::middleware('can:view plans')->group(function () {
         Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
+        Route::get('/plans/{plan}', [PlanController::class, 'show'])->name('plans.show'); 
     });
 
     Route::middleware('can:create plans')->group(function () {
@@ -137,20 +138,20 @@ Route::middleware('auth')->group(function () {
         Route::delete('/plans/{plan}', [PlanController::class, 'destroy'])->name('plans.destroy');
     });
 
-// 1. First, define all static/non-parameter routes
-Route::middleware('can:view tools')->group(function () {
-    Route::get('/tools', [AIToolController::class, 'index'])->name('tools.index');
-});
+    // 1. First, define all static/non-parameter routes
+    Route::middleware('can:view tools')->group(function () {
+        Route::get('/tools', [AIToolController::class, 'index'])->name('tools.index');
+    });
 
-Route::middleware('can:create tools')->group(function () {
-    Route::get('/tools/create', [AIToolController::class, 'create'])->name('tools.create');
-    Route::post('/tools', [AIToolController::class, 'store'])->name('tools.store');
-});
+    Route::middleware('can:create tools')->group(function () {
+        Route::get('/tools/create', [AIToolController::class, 'create'])->name('tools.create');
+        Route::post('/tools', [AIToolController::class, 'store'])->name('tools.store');
+    });
 
-// 2. Then define routes with parameters
-Route::middleware('can:view tools')->group(function () {
-    Route::get('/tools/{tool}', [AIToolController::class, 'show'])->name('tools.show');
-});
+    // 2. Then define routes with parameters
+    Route::middleware('can:view tools')->group(function () {
+        Route::get('/tools/{tool}', [AIToolController::class, 'show'])->name('tools.show');
+    });
 
     Route::middleware('can:edit tools')->group(function () {
         Route::get('/tools/{tool}/edit', [AIToolController::class, 'edit'])->name('tools.edit');
@@ -165,6 +166,8 @@ Route::middleware('can:view tools')->group(function () {
     // Subscription Management
     Route::middleware('can:view subscriptions')->group(function () {
         Route::get('/subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
+        Route::get('/subscriptions/export', [SubscriptionController::class, 'export'])->name('subscriptions.export');
+        Route::get('/subscriptions/statistics', [SubscriptionController::class, 'statistics'])->name('subscriptions.statistics');
         Route::get('/subscriptions/{subscription}', [SubscriptionController::class, 'show'])->name('subscriptions.show');
     });
 
@@ -172,10 +175,15 @@ Route::middleware('can:view tools')->group(function () {
         Route::post('subscriptions/{subscription}/toggle-status', [SubscriptionController::class, 'toggleStatus'])->name('subscriptions.toggle-status');
     });
 
-    // License Management (commented out)
-    // Route::resource('licenses', LicenseController::class);
-    // Route::post('licenses/{license}/toggle-status', [LicenseController::class, 'toggleStatus'])->name('licenses.toggle-status');
+    // Tool subscription - FIXED: Using different route name
+    Route::get('/tools/{tool}/subscribe', [SubscriptionController::class, 'subscribe'])->name('tools.subscribe');
+    Route::post('/tools/{tool}/subscribe', [SubscriptionController::class, 'store'])->name('subscriptions.store');
 
+    // License management
+    Route::get('/licenses/{license}', [SubscriptionController::class, 'showLicense'])->name('licenses.show');
+    Route::get('/licenses/{license}/renew', [SubscriptionController::class, 'renew'])->name('subscriptions.renew');
+    Route::post('/licenses/{license}/renew', [SubscriptionController::class, 'processRenewal'])->name('subscriptions.renew.process');
+    Route::delete('/licenses/{license}/cancel', [SubscriptionController::class, 'cancel'])->name('subscriptions.cancel');
 });
 
 require __DIR__.'/auth.php';

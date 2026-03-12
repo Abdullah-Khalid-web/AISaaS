@@ -1,4 +1,4 @@
-<!-- resources/js/Pages/Subscriptions/Create.vue -->
+<!-- resources/js/Pages/Subscriptions/Subscribe.vue -->
 <script setup>
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
@@ -47,8 +47,11 @@ const formatCurrency = (price, currency = 'USD') => {
 const submit = () => {
     form.post(route('subscriptions.store', props.tool.id), {
         preserveScroll: true,
-        onSuccess: () => {
-            // Redirect to license view
+        onSuccess: (response) => {
+            // Redirect to the license view page
+            if (response.props.flash?.license_id) {
+                window.location.href = route('licenses.show', response.props.flash.license_id);
+            }
         }
     });
 };
@@ -325,6 +328,12 @@ const paymentIcons = {
                                 <span class="text-xl font-bold text-indigo-600">{{ formatCurrency(selectedPlan.price, selectedPlan.currency) }}</span>
                             </div>
                             <p class="text-xs text-gray-500">per {{ selectedPlan.billing_cycle }}</p>
+                        </div>
+                        <div v-else class="text-center py-8 text-gray-500">
+                            <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                            <p>Select a plan to continue</p>
                         </div>
 
                         <!-- Features List -->

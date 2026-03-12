@@ -290,7 +290,7 @@ const uniqueCategories = computed(() => {
                                     class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm">
                                 Quick View
                             </button>
-                            <Link :href="route('tools.show', tool.id)"
+                            <Link :href="route('Alltools.show', tool.id)"
                                   class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm text-center">
                                 View Details
                             </Link>
