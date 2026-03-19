@@ -15,6 +15,9 @@ use App\Http\Controllers\AllToolsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\AI\Api\LicenseApiController;
+
 
 // Public routes (no auth required)
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -34,6 +37,14 @@ Route::get('/contact', function () {
 })->name('contact');
 
 Route::get('/pricing', [PlanController::class, 'publicPricing'])->name('pricing');
+Route::get('/plans/{plan}', [PlanController::class, 'show'])->name('plans.show');
+
+// Stripe Checkout Routes - These should be accessible to ALL authenticated users, not just admins
+Route::middleware('auth')->group(function () {
+    Route::post('/plans/{plan}/stripe-checkout', [PlanController::class, 'createStripeCheckout'])->name('plans.stripe.checkout');
+    Route::get('/plans/{plan}/stripe-success', [PlanController::class, 'stripeSuccess'])->name('plans.stripe.success');
+    Route::get('/plans/{plan}/stripe-cancel', [PlanController::class, 'stripeCancel'])->name('plans.stripe.cancel');
+});
 
 // Authenticated routes (require login)
 Route::middleware('auth')->group(function () {
@@ -117,10 +128,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
     });
 
-    // Plan Management
+    // Plan Management (Admin only)
     Route::middleware('can:view plans')->group(function () {
         Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
-        Route::get('/plans/{plan}', [PlanController::class, 'show'])->name('plans.show'); 
     });
 
     Route::middleware('can:create plans')->group(function () {
@@ -138,7 +148,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/plans/{plan}', [PlanController::class, 'destroy'])->name('plans.destroy');
     });
 
-    // 1. First, define all static/non-parameter routes
+    // Tool Management (Admin only)
     Route::middleware('can:view tools')->group(function () {
         Route::get('/tools', [AIToolController::class, 'index'])->name('tools.index');
     });
@@ -148,7 +158,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/tools', [AIToolController::class, 'store'])->name('tools.store');
     });
 
-    // 2. Then define routes with parameters
     Route::middleware('can:view tools')->group(function () {
         Route::get('/tools/{tool}', [AIToolController::class, 'show'])->name('tools.show');
     });
@@ -163,19 +172,20 @@ Route::middleware('auth')->group(function () {
         Route::delete('/tools/{tool}', [AIToolController::class, 'destroy'])->name('tools.destroy');
     });
 
-    // Subscription Management
-    Route::middleware('can:view subscriptions')->group(function () {
-        Route::get('/subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
-        Route::get('/subscriptions/export', [SubscriptionController::class, 'export'])->name('subscriptions.export');
-        Route::get('/subscriptions/statistics', [SubscriptionController::class, 'statistics'])->name('subscriptions.statistics');
-        Route::get('/subscriptions/{subscription}', [SubscriptionController::class, 'show'])->name('subscriptions.show');
-    });
+    // Subscription Management (Users and Admins)
+    Route::get('/subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
+    Route::get('/subscriptions/export', [SubscriptionController::class, 'export'])->name('subscriptions.export');
+    Route::get('/subscriptions/statistics', [SubscriptionController::class, 'statistics'])->name('subscriptions.statistics');
+    Route::get('/subscriptions/{subscription}', [SubscriptionController::class, 'show'])->name('subscriptions.show');
 
-    Route::middleware('can:edit subscriptions')->group(function () {
-        Route::post('subscriptions/{subscription}/toggle-status', [SubscriptionController::class, 'toggleStatus'])->name('subscriptions.toggle-status');
-    });
+    // Admin-only status update
+    Route::put('/subscriptions/{license}/status', [SubscriptionController::class, 'updateStatus'])
+        ->name('subscriptions.update-status')
+        ->middleware('role:admin|super-admin');
 
-    // Tool subscription - FIXED: Using different route name
+    Route::post('subscriptions/{subscription}/toggle-status', [SubscriptionController::class, 'toggleStatus'])->name('subscriptions.toggle-status');
+
+    // Tool subscription
     Route::get('/tools/{tool}/subscribe', [SubscriptionController::class, 'subscribe'])->name('tools.subscribe');
     Route::post('/tools/{tool}/subscribe', [SubscriptionController::class, 'store'])->name('subscriptions.store');
 

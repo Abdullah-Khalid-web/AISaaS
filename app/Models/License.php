@@ -37,12 +37,14 @@ class License extends Model
         'metadata',
         'is_trial',
         'auto_renew',
-        'notes'
+        'notes',
+        'devices',
     ];
 
     protected $casts = [
         'allowed_domains' => 'array',
         'allowed_ips' => 'array',
+        'device' => 'array',
         'device_ids' => 'array',
         'metadata' => 'array',
         'starts_at' => 'datetime',

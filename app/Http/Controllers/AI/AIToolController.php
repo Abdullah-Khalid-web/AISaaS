@@ -59,6 +59,64 @@ class AIToolController extends Controller
         return Inertia::render('Tools/Create');
     }
 
+    // public function store(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'name' => 'required|string|max:255',
+    //         'description' => 'nullable|string',
+    //         'sdk_download_url' => 'nullable|string|max:255',
+    //         'version' => 'nullable|string|max:50',
+    //         'supported_platforms' => 'nullable|array',
+    //         'metadata' => 'nullable|array',
+    //         'is_active' => 'boolean',
+    //         'sort_order' => 'nullable|integer'
+    //     ]);
+
+    //     // Set defaults
+    //     $validated['is_active'] = $validated['is_active'] ?? true;
+    //     $validated['sort_order'] = $validated['sort_order'] ?? 0;
+    //     $validated['metadata'] = $validated['metadata'] ?? [
+    //         'icon' => '🤖',
+    //         'features' => [],
+    //         'documentation_url' => null
+    //     ];
+
+    //     AiTool::create($validated);
+
+    //     return redirect()->route('tools.index')
+    //         ->with('success', 'Tool created successfully.');
+    // }
+    // public function store(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'name' => 'required|string|max:255',
+    //         'description' => 'nullable|string',
+    //         'sdk_download_url' => 'nullable|string|max:255',
+    //         'version' => 'nullable|string|max:50',
+    //         'supported_platforms' => 'nullable|array',
+    //         'metadata' => 'nullable|array',
+    //         'file_formats' => 'nullable|array', // New validation rule
+    //         'is_active' => 'boolean',
+    //         'sort_order' => 'nullable|integer'
+    //     ]);
+
+    //     // Set defaults
+    //     $validated['is_active'] = $validated['is_active'] ?? true;
+    //     $validated['sort_order'] = $validated['sort_order'] ?? 0;
+    //     $validated['metadata'] = $validated['metadata'] ?? [
+    //         'icon' => '🤖',
+    //         'features' => [],
+    //         'documentation_files' => [] // Changed from documentation_url
+    //     ];
+
+    //     // Ensure file_formats is an array
+    //     $validated['file_formats'] = $validated['file_formats'] ?? [];
+
+    //     AiTool::create($validated);
+
+    //     return redirect()->route('tools.index')
+    //         ->with('success', 'Tool created successfully.');
+    // }
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -75,11 +133,14 @@ class AIToolController extends Controller
         // Set defaults
         $validated['is_active'] = $validated['is_active'] ?? true;
         $validated['sort_order'] = $validated['sort_order'] ?? 0;
-        $validated['metadata'] = $validated['metadata'] ?? [
+
+        // Ensure metadata has all required fields
+        $validated['metadata'] = array_merge([
             'icon' => '🤖',
             'features' => [],
-            'documentation_url' => null
-        ];
+            'documentation_files' => [],
+            'color' => '#4f46e5'
+        ], $validated['metadata'] ?? []);
 
         AiTool::create($validated);
 
@@ -94,6 +155,44 @@ class AIToolController extends Controller
         ]);
     }
 
+    // public function update(Request $request, AiTool $tool)
+    // {
+    //     $validated = $request->validate([
+    //         'name' => 'required|string|max:255',
+    //         'description' => 'nullable|string',
+    //         'sdk_download_url' => 'nullable|string|max:255',
+    //         'version' => 'nullable|string|max:50',
+    //         'supported_platforms' => 'nullable|array',
+    //         'metadata' => 'nullable|array',
+    //         'is_active' => 'boolean',
+    //         'sort_order' => 'nullable|integer'
+    //     ]);
+
+    //     $tool->update($validated);
+
+    //     return redirect()->route('tools.index')
+    //         ->with('success', 'Tool updated successfully.');
+    // }
+
+    // public function update(Request $request, AiTool $tool)
+    // {
+    //     $validated = $request->validate([
+    //         'name' => 'required|string|max:255',
+    //         'description' => 'nullable|string',
+    //         'sdk_download_url' => 'nullable|string|max:255',
+    //         'version' => 'nullable|string|max:50',
+    //         'supported_platforms' => 'nullable|array',
+    //         'metadata' => 'nullable|array',
+    //         'file_formats' => 'nullable|array', // Add this
+    //         'is_active' => 'boolean',
+    //         'sort_order' => 'nullable|integer'
+    //     ]);
+
+    //     $tool->update($validated);
+
+    //     return redirect()->route('tools.index')
+    //         ->with('success', 'Tool updated successfully.');
+    // }
     public function update(Request $request, AiTool $tool)
     {
         $validated = $request->validate([
@@ -112,7 +211,6 @@ class AIToolController extends Controller
         return redirect()->route('tools.index')
             ->with('success', 'Tool updated successfully.');
     }
-
     public function destroy(AiTool $tool)
     {
         // Check if tool has any active plans or licenses before deleting

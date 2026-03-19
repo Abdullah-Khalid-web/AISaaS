@@ -9,7 +9,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UsageLog extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory
+    // ,
+    // SoftDeletes
+    ;
 
     protected $table = 'usage_logs';
 
@@ -45,7 +48,7 @@ class UsageLog extends Model
         'response_time_ms' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'deleted_at' => 'datetime'
+        // 'deleted_at' => 'datetime'
     ];
 
     protected $attributes = [

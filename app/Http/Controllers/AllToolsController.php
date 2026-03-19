@@ -87,6 +87,39 @@ class AllToolsController extends Controller
             ->where('is_active', true)
             ->findOrFail($id);
 
+        // Preserve the original metadata including documentation_files
+        $originalMetadata = $tool->metadata ?? [];
+
+        // Merge with defaults but preserve existing data
+        $metadata = array_merge([
+            'icon' => '🤖',
+            'color' => '#4f46e5',
+            'features' => [],
+            'use_cases' => [],
+            'integrations' => [],
+            'faqs' => [],
+            'documentation_files' => [], // Initialize empty array if not exists
+            'detailed_description' => $tool->description,
+            'active_users' => '10k+',
+            'api_calls' => '1M+',
+            'rating' => '4.8/5',
+            'uptime' => '99.9%',
+            'languages' => ['English'],
+            'last_updated' => $tool->updated_at->format('Y'),
+            'support_type' => '24/7 Email Support'
+        ], $originalMetadata);
+
+        // Ensure documentation_files is an array
+        if (!isset($metadata['documentation_files']) || !is_array($metadata['documentation_files'])) {
+            $metadata['documentation_files'] = [];
+        }
+
+        // Debug: Log the documentation files to check if they exist
+        \Log::info('Documentation files for tool ' . $tool->id, [
+            'count' => count($metadata['documentation_files']),
+            'files' => $metadata['documentation_files']
+        ]);
+
         // Transform tool data
         $toolData = [
             'id' => $tool->id,
@@ -94,31 +127,17 @@ class AllToolsController extends Controller
             'slug' => $tool->slug,
             'description' => $tool->description,
             'version' => $tool->version,
-            'metadata' => array_merge([
-                'icon' => '🤖',
-                'color' => '#4f46e5',
-                'features' => [],
-                'use_cases' => [],
-                'integrations' => [],
-                'faqs' => [],
-                'detailed_description' => $tool->description,
-                'active_users' => '10k+',
-                'api_calls' => '1M+',
-                'rating' => '4.8/5',
-                'uptime' => '99.9%',
-                'languages' => ['English'],
-                'last_updated' => $tool->updated_at->format('Y'),
-                'support_type' => '24/7 Email Support'
-            ], $tool->metadata ?? []),
-            'icon' => $tool->metadata['icon'] ?? '🤖',
-            'color' => $tool->metadata['color'] ?? '#4f46e5',
-            'tags' => collect($tool->metadata['categories'] ?? [])
-                ->merge($tool->metadata['tags'] ?? [])
+            'metadata' => $metadata, // Use the merged metadata
+            'icon' => $metadata['icon'],
+            'color' => $metadata['color'],
+            'tags' => collect($metadata['categories'] ?? [])
+                ->merge($metadata['tags'] ?? [])
                 ->unique()
                 ->values()
                 ->toArray(),
             'is_new' => $tool->created_at->gt(now()->subDays(30)),
             'supported_platforms' => $tool->supported_platforms ?? ['Web', 'iOS', 'Android'],
+            'sdk_download_url' => $tool->sdk_download_url, // Make sure to include this
             'plans' => $tool->plans->map(function ($plan) {
                 return [
                     'id' => $plan->id,

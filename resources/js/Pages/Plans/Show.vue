@@ -1,8 +1,9 @@
 <!-- resources/js/Pages/Plans/Show.vue -->
 <script setup>
 import GuestLayout from '@/Layouts/GuestLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
+import axios from 'axios';
 
 const props = defineProps({
     plan: {
@@ -11,10 +12,14 @@ const props = defineProps({
     }
 });
 
+// Get auth state from Inertia page props
+const page = usePage();
+const isAuthenticated = computed(() => page.props.auth?.user !== null);
+
 // State
 const showSubscribeModal = ref(false);
-const paymentMethod = ref('stripe');
 const agreeToTerms = ref(false);
+const stripeLoading = ref(false);
 
 // Form
 const form = useForm({
@@ -54,7 +59,7 @@ const getPriceDisplay = () => {
 
 // Get billing cycle badge
 const getBillingCycleBadge = (cycle) => {
-    switch(cycle) {
+    switch (cycle) {
         case 'monthly': return 'bg-blue-100 text-blue-800';
         case 'quarterly': return 'bg-purple-100 text-purple-800';
         case 'yearly': return 'bg-green-100 text-green-800';
@@ -64,14 +69,63 @@ const getBillingCycleBadge = (cycle) => {
     }
 };
 
-// Submit subscription
-const subscribe = () => {
-    form.post(route('subscriptions.store', props.plan.tool_id), {
-        preserveScroll: true,
-        onSuccess: () => {
-            showSubscribeModal.value = false;
+// Check authentication before showing modal or proceeding
+const handleSubscribeClick = () => {
+    if (!isAuthenticated.value) {
+        // Redirect to login with a return URL
+        const returnUrl = route('plans.show', props.plan.id);
+        window.location.href = route('login') + '?redirect=' + encodeURIComponent(returnUrl);
+        return;
+    }
+
+    // If authenticated, show the modal
+    showSubscribeModal.value = true;
+};
+
+// Stripe Checkout
+const subscribe = async () => {
+    if (!agreeToTerms.value || stripeLoading.value) return;
+
+    // Double-check authentication before proceeding
+    if (!isAuthenticated.value) {
+        alert('You must be logged in to subscribe. Please log in and try again.');
+        window.location.href = route('login') + '?redirect=' + encodeURIComponent(route('plans.show', props.plan.id));
+        return;
+    }
+
+    stripeLoading.value = true;
+
+    try {
+        const response = await axios.post(route('plans.stripe.checkout', props.plan.id), {
+            package_name: form.package_name,
+            payment_method: 'stripe',
+        });
+
+        if (response.data?.success && response.data?.checkout_url) {
+            window.location.href = response.data.checkout_url;
+            return;
         }
-    });
+
+        alert(response.data?.message || 'Unable to start Stripe checkout.');
+    } catch (error) {
+        console.error('Stripe checkout error:', error);
+
+        // Check for authentication errors
+        if (error.response?.status === 401) {
+            alert('Your session has expired. Please log in again.');
+            window.location.href = route('login') + '?redirect=' + encodeURIComponent(route('plans.show', props.plan.id));
+            return;
+        }
+
+        const message =
+            error.response?.data?.message ||
+            error.response?.data?.errors?.package_name?.[0] ||
+            'Something went wrong while starting Stripe checkout.';
+
+        alert(message);
+    } finally {
+        stripeLoading.value = false;
+    }
 };
 
 // Features list
@@ -84,12 +138,16 @@ const features = computed(() => {
         },
         {
             name: 'Devices',
-            value: props.plan.device_limit === 999 ? 'Unlimited devices' : `${props.plan.device_limit} device${props.plan.device_limit > 1 ? 's' : ''}`,
+            value: props.plan.device_limit === 999
+                ? 'Unlimited devices'
+                : `${props.plan.device_limit} device${props.plan.device_limit > 1 ? 's' : ''}`,
             icon: '💻'
         },
         {
             name: 'Concurrent Users',
-            value: props.plan.concurrent_users ? `${props.plan.concurrent_users} user${props.plan.concurrent_users > 1 ? 's' : ''}` : '1 user',
+            value: props.plan.concurrent_users
+                ? `${props.plan.concurrent_users} user${props.plan.concurrent_users > 1 ? 's' : ''}`
+                : '1 user',
             icon: '👥'
         },
         {
@@ -158,7 +216,7 @@ const features = computed(() => {
 
                         <!-- CTA Buttons -->
                         <div class="mt-8 flex space-x-4">
-                            <button @click="showSubscribeModal = true"
+                            <button @click="handleSubscribeClick"
                                     class="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
                                 Subscribe Now
                             </button>
@@ -166,6 +224,18 @@ const features = computed(() => {
                                   class="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50 transition text-center">
                                 Contact Sales
                             </Link>
+                        </div>
+
+                        <!-- Login Prompt for Guests (Optional) -->
+                        <div v-if="!isAuthenticated" class="mt-4 p-3 bg-blue-50 rounded-lg text-center">
+                            <p class="text-sm text-blue-700">
+                                Already have an account?
+                                <Link :href="route('login') + '?redirect=' + encodeURIComponent(route('plans.show', plan.id))"
+                                      class="font-medium underline hover:text-blue-900">
+                                    Log in
+                                </Link>
+                                to subscribe faster.
+                            </p>
                         </div>
                     </div>
 
@@ -199,7 +269,7 @@ const features = computed(() => {
                         </div>
                     </div>
 
-                    <!-- Limitations (if any) -->
+                    <!-- Limitations -->
                     <div v-if="plan.limitations && plan.limitations.length" class="bg-white rounded-lg shadow-lg p-8">
                         <h2 class="text-2xl font-bold text-gray-900 mb-6">Plan Limitations</h2>
                         <ul class="space-y-3">
@@ -214,7 +284,7 @@ const features = computed(() => {
                     </div>
                 </div>
 
-                <!-- Right Column - Tool Info & Comparison -->
+                <!-- Right Column -->
                 <div class="lg:col-span-1 space-y-6">
                     <!-- Tool Info Card -->
                     <div class="bg-white rounded-lg shadow-lg p-6 sticky top-6">
@@ -294,7 +364,7 @@ const features = computed(() => {
             </div>
         </div>
 
-        <!-- Subscribe Modal -->
+        <!-- Stripe Subscribe Modal -->
         <div v-if="showSubscribeModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showSubscribeModal = false"></div>
@@ -323,55 +393,53 @@ const features = computed(() => {
                                     </div>
                                 </div>
 
-                                <!-- Payment Method -->
+                                <!-- Stripe Only Payment Method -->
                                 <div class="mb-4">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <button @click="paymentMethod = 'stripe'; form.payment_method = 'stripe'"
-                                                :class="['border-2 rounded-lg p-3 flex items-center justify-center space-x-2',
-                                                         paymentMethod === 'stripe' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200']">
-                                            <span>💳</span>
-                                            <span>Credit Card</span>
-                                        </button>
-                                        <button @click="paymentMethod = 'paypal'; form.payment_method = 'paypal'"
-                                                :class="['border-2 rounded-lg p-3 flex items-center justify-center space-x-2',
-                                                         paymentMethod === 'paypal' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200']">
-                                            <span>🅿️</span>
-                                            <span>PayPal</span>
-                                        </button>
+                                    <div class="border-2 border-indigo-500 bg-indigo-50 rounded-lg p-4 flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <span class="text-2xl">💳</span>
+                                            <div>
+                                                <p class="font-medium text-gray-900">Stripe Checkout</p>
+                                                <p class="text-sm text-gray-600">Secure card payment powered by Stripe</p>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs font-semibold text-indigo-600 bg-white px-2 py-1 rounded">
+                                            TEST MODE
+                                        </span>
                                     </div>
                                 </div>
 
-                                <!-- Demo Card Details -->
-                                <div v-if="paymentMethod === 'stripe'" class="mb-4 space-y-3">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Card Number</label>
-                                        <input type="text" value="4242 4242 4242 4242" disabled
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Expiry</label>
-                                            <input type="text" value="12/25" disabled class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">CVC</label>
-                                            <input type="text" value="123" disabled class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
-                                        </div>
-                                    </div>
+                                <!-- Stripe Test Info -->
+                                <div class="mb-4 rounded-lg bg-gray-50 border border-gray-200 p-4">
+                                    <p class="text-sm font-medium text-gray-900 mb-1">Stripe Test Mode</p>
+                                    <p class="text-sm text-gray-600">
+                                        After clicking confirm, you'll be redirected to Stripe Checkout to complete payment securely.
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-2">
+                                        Test card: 4242 4242 4242 4242
+                                    </p>
                                 </div>
 
                                 <!-- Package Name -->
                                 <div class="mb-4">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">License Name (Optional)</label>
-                                    <input type="text" v-model="form.package_name"
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                                    <input
+                                        type="text"
+                                        v-model="form.package_name"
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                        placeholder="Enter a custom license name"
+                                    >
                                 </div>
 
                                 <!-- Terms -->
                                 <div class="flex items-center">
-                                    <input type="checkbox" v-model="agreeToTerms" id="modal-terms"
-                                           class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <input
+                                        type="checkbox"
+                                        v-model="agreeToTerms"
+                                        id="modal-terms"
+                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                    >
                                     <label for="modal-terms" class="ml-2 text-sm text-gray-600">
                                         I agree to the Terms of Service
                                     </label>
@@ -381,16 +449,23 @@ const features = computed(() => {
                     </div>
 
                     <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button @click="subscribe" :disabled="!agreeToTerms || form.processing"
-                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50">
-                            <svg v-if="form.processing" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <button
+                            @click="subscribe"
+                            :disabled="!agreeToTerms || stripeLoading"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                        >
+                            <svg v-if="stripeLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            Confirm Subscription
+                            {{ stripeLoading ? 'Redirecting to Stripe...' : 'Confirm & Pay with Stripe' }}
                         </button>
-                        <button @click="showSubscribeModal = false"
-                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm">
+
+                        <button
+                            @click="showSubscribeModal = false"
+                            :disabled="stripeLoading"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50"
+                        >
                             Cancel
                         </button>
                     </div>

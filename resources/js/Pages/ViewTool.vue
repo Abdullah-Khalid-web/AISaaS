@@ -20,6 +20,11 @@ const selectedPlan = ref(null);
 const showPlanModal = ref(false);
 const activeTab = ref('overview');
 const showFullDescription = ref(false);
+const selectedFile = ref(null);
+const showFilePreview = ref(false);
+const textContent = ref(null);
+const previewLoading = ref(false);
+const previewError = ref(null);
 
 // Format currency
 const formatCurrency = (price, currency = 'USD') => {
@@ -30,6 +35,190 @@ const formatCurrency = (price, currency = 'USD') => {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
     }).format(price);
+};
+
+// Format file size
+const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+// Get file icon based on type
+const getFileIcon = (fileName, fileType) => {
+    const extension = fileName?.split('.').pop()?.toLowerCase();
+
+    const icons = {
+        pdf: '📕',
+        doc: '📘',
+        docx: '📘',
+        txt: '📃',
+        md: '📝',
+        json: '🔧',
+        html: '🌐',
+        css: '🎨',
+        js: '💻',
+        py: '🐍',
+        java: '☕',
+        cpp: '⚙️',
+        php: '🐘',
+        sql: '🗄️',
+        rtf: '📄',
+        jpg: '🖼️',
+        jpeg: '🖼️',
+        png: '🖼️',
+        gif: '🎨',
+        svg: '🎨'
+    };
+
+    if (fileType?.startsWith('image/')) return '🖼️';
+    return icons[extension] || '📄';
+};
+
+// Check if file is an image
+const isImageFile = (file) => {
+    return file.type?.startsWith('image/') ||
+           file.name?.match(/\.(jpg|jpeg|png|gif|svg)$/i);
+};
+
+// Check if file is a text document that can be previewed
+const isTextFile = (file) => {
+    if (!file || !file.name) return false;
+
+    const textExtensions = [
+        'txt', 'md', 'json', 'html', 'htm', 'css', 'js', 'jsx', 'ts', 'tsx',
+        'xml', 'yaml', 'yml', 'ini', 'cfg', 'conf', 'log', 'csv', 'sql',
+        'php', 'py', 'rb', 'java', 'c', 'cpp', 'h', 'hpp', 'go', 'rs', 'swift'
+    ];
+
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    return file.type?.startsWith('text/') || textExtensions.includes(extension || '');
+};
+
+// Preview file
+const previewFile = async (file) => {
+    if (file.content) {
+        selectedFile.value = file;
+        showFilePreview.value = true;
+
+        // Reset states
+        textContent.value = null;
+        previewLoading.value = false;
+        previewError.value = null;
+
+        // If it's a text file, decode it
+        if (isTextFile(file)) {
+            await decodeTextContent(file);
+        }
+    } else if (file.url) {
+        window.open(file.url, '_blank');
+    }
+};
+
+// Decode text content with better error handling
+const decodeTextContent = async (file) => {
+    if (!file.content) {
+        previewError.value = 'No content available';
+        return;
+    }
+
+    previewLoading.value = true;
+
+    try {
+        let content = file.content;
+        let decodedContent = '';
+
+        // Handle data URLs
+        if (content.startsWith('data:')) {
+            // Extract the base64 part
+            const base64Match = content.match(/^data:([^;]+);base64,(.+)$/);
+
+            if (base64Match && base64Match.length === 3) {
+                // It's a proper data URL with base64
+                const base64Content = base64Match[2];
+
+                try {
+                    // Decode base64 to binary string
+                    const binaryString = atob(base64Content);
+
+                    // Convert to Uint8Array for proper UTF-8 handling
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    // Try to decode as UTF-8
+                    const decoder = new TextDecoder('utf-8');
+                    decodedContent = decoder.decode(bytes);
+
+                } catch (e) {
+                    console.error('Base64 decode error:', e);
+
+                    // Fallback: try simple atob
+                    try {
+                        decodedContent = atob(base64Content);
+                    } catch (e2) {
+                        throw new Error('Failed to decode base64 content');
+                    }
+                }
+            } else {
+                // Try to get content after comma
+                const commaIndex = content.indexOf(',');
+                if (commaIndex !== -1) {
+                    const base64Content = content.substring(commaIndex + 1);
+                    try {
+                        decodedContent = atob(base64Content);
+                    } catch (e) {
+                        // If it's not base64, use as is
+                        decodedContent = base64Content;
+                    }
+                } else {
+                    decodedContent = content;
+                }
+            }
+        } else {
+            // Assume it's already plain text
+            decodedContent = content;
+        }
+
+        // Clean up the content (remove null bytes, etc.)
+        decodedContent = decodedContent.replace(/\0/g, '');
+
+        textContent.value = decodedContent;
+        previewError.value = null;
+
+    } catch (e) {
+        console.error('Error decoding text file:', e);
+        previewError.value = 'Error loading file content. You can download the file instead.';
+        textContent.value = null;
+    } finally {
+        previewLoading.value = false;
+    }
+};
+
+// Download file
+const downloadFile = (file) => {
+    if (file.content) {
+        const link = document.createElement('a');
+        link.href = file.content;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } else if (file.url) {
+        window.open(file.url, '_blank');
+    }
+};
+
+// Close preview
+const closePreview = () => {
+    showFilePreview.value = false;
+    selectedFile.value = null;
+    textContent.value = null;
+    previewLoading.value = false;
+    previewError.value = null;
 };
 
 // Get plan badge color
@@ -67,6 +256,11 @@ const integrations = computed(() => {
 // Get FAQs
 const faqs = computed(() => {
     return props.tool.metadata?.faqs || [];
+});
+
+// Get documentation files
+const documentationFiles = computed(() => {
+    return props.tool.metadata?.documentation_files || [];
 });
 
 // Get supported languages
@@ -264,24 +458,32 @@ const stats = computed(() => {
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <!-- Tabs Navigation -->
             <div class="border-b border-gray-200 mb-8">
-                <nav class="flex space-x-8">
+                <nav class="flex space-x-8 overflow-x-auto">
                     <button @click="activeTab = 'overview'"
-                            :class="['pb-4 px-1 border-b-2 font-medium text-sm',
+                            :class="['pb-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
                                      activeTab === 'overview' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
                         Overview
                     </button>
                     <button @click="activeTab = 'features'"
-                            :class="['pb-4 px-1 border-b-2 font-medium text-sm',
+                            :class="['pb-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
                                      activeTab === 'features' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
                         Features
                     </button>
+                    <button @click="activeTab = 'documentation'"
+                            :class="['pb-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+                                     activeTab === 'documentation' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                        Documentation
+                        <span v-if="documentationFiles.length" class="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
+                            {{ documentationFiles.length }}
+                        </span>
+                    </button>
                     <button @click="activeTab = 'pricing'"
-                            :class="['pb-4 px-1 border-b-2 font-medium text-sm',
+                            :class="['pb-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
                                      activeTab === 'pricing' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
                         Pricing & Plans
                     </button>
                     <button @click="activeTab = 'faq'"
-                            :class="['pb-4 px-1 border-b-2 font-medium text-sm',
+                            :class="['pb-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
                                      activeTab === 'faq' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
                         FAQ
                     </button>
@@ -305,6 +507,50 @@ const stats = computed(() => {
                                         class="text-indigo-600 hover:text-indigo-800 text-sm font-medium mt-2">
                                     {{ showFullDescription ? 'Show less' : 'Read more' }}
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- Quick Documentation Preview -->
+                        <div v-if="documentationFiles.length > 0" class="bg-white rounded-lg shadow-sm p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="text-2xl font-bold text-gray-900">Documentation</h2>
+                                <button @click="activeTab = 'documentation'"
+                                        class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center">
+                                    View All
+                                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div v-for="(file, index) in documentationFiles.slice(0, 4)" :key="index"
+                                     class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">{{ getFileIcon(file.name, file.type) }}</span>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-900 truncate max-w-[150px]">{{ file.name }}</p>
+                                            <p class="text-xs text-gray-500">{{ formatFileSize(file.size) }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button @click="previewFile(file)"
+                                                class="text-indigo-600 hover:text-indigo-900 p-1"
+                                                title="Preview">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                            </svg>
+                                        </button>
+                                        <button @click="downloadFile(file)"
+                                                class="text-green-600 hover:text-green-900 p-1"
+                                                title="Download">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -403,11 +649,38 @@ const stats = computed(() => {
                                     <span class="text-gray-500">Support</span>
                                     <span class="font-medium">{{ tool.metadata?.support_type || '24/7 Email' }}</span>
                                 </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-500">Documents</span>
+                                    <span class="font-medium">{{ documentationFiles.length }} files</span>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- Documentation Summary Card -->
+                        <div v-if="documentationFiles.length > 0" class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg shadow-sm p-6">
+                            <svg class="w-full h-24 mb-4" viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M40 20 L40 60 L100 60 L100 20" stroke="#4F46E5" stroke-width="2" fill="none"/>
+                                <path d="M100 20 L160 20 L160 60 L100 60" stroke="#4F46E5" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
+                                <rect x="45" y="25" width="10" height="5" fill="#4F46E5" fill-opacity="0.2"/>
+                                <rect x="60" y="25" width="30" height="5" fill="#4F46E5" fill-opacity="0.4"/>
+                                <rect x="45" y="35" width="45" height="5" fill="#4F46E5" fill-opacity="0.2"/>
+                                <rect x="45" y="45" width="25" height="5" fill="#4F46E5" fill-opacity="0.3"/>
+                            </svg>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Documentation Available</h3>
+                            <p class="text-sm text-gray-600 mb-4">
+                                {{ documentationFiles.length }} file{{ documentationFiles.length > 1 ? 's' : '' }} including guides, API references, and examples
+                            </p>
+                            <button @click="activeTab = 'documentation'"
+                                    class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center">
+                                Browse Documentation
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </button>
+                        </div>
+
                         <!-- Quick Start Guide SVG -->
-                        <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg shadow-sm p-6">
+                        <div class="bg-white rounded-lg shadow-sm p-6">
                             <svg class="w-full h-32 mb-4" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <rect x="10" y="20" width="30" height="60" rx="4" fill="#4F46E5" fill-opacity="0.2" stroke="#4F46E5" stroke-width="2"/>
                                 <rect x="50" y="20" width="30" height="60" rx="4" fill="#4F46E5" fill-opacity="0.4" stroke="#4F46E5" stroke-width="2"/>
@@ -419,26 +692,6 @@ const stats = computed(() => {
                             <p class="text-sm text-gray-600 mb-4">Get up and running in minutes with our comprehensive guide</p>
                             <a href="#" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center">
                                 View Guide
-                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </a>
-                        </div>
-
-                        <!-- Documentation SVG -->
-                        <div class="bg-white rounded-lg shadow-sm p-6">
-                            <svg class="w-full h-24 mb-4" viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M40 20 L40 60 L100 60 L100 20" stroke="#4F46E5" stroke-width="2" fill="none"/>
-                                <path d="M100 20 L160 20 L160 60 L100 60" stroke="#4F46E5" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
-                                <rect x="45" y="25" width="10" height="5" fill="#4F46E5" fill-opacity="0.2"/>
-                                <rect x="60" y="25" width="30" height="5" fill="#4F46E5" fill-opacity="0.4"/>
-                                <rect x="45" y="35" width="45" height="5" fill="#4F46E5" fill-opacity="0.2"/>
-                                <rect x="45" y="45" width="25" height="5" fill="#4F46E5" fill-opacity="0.3"/>
-                            </svg>
-                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Documentation</h3>
-                            <p class="text-sm text-gray-600 mb-4">API references, guides, and examples</p>
-                            <a href="#" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center">
-                                Read Docs
                                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                 </svg>
@@ -496,6 +749,116 @@ const stats = computed(() => {
                             <text x="305" y="180" fill="#4B5563" font-size="12">Business</text>
                             <text x="380" y="180" fill="#4B5563" font-size="12">Enterprise</text>
                         </svg>
+                    </div>
+                </div>
+
+                <!-- Documentation Tab -->
+                <div v-if="activeTab === 'documentation'" class="space-y-8">
+                    <!-- Documentation Header -->
+                    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg p-8 text-white">
+                        <div class="flex items-center gap-4 mb-4">
+                            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                            <div>
+                                <h2 class="text-3xl font-bold">Documentation</h2>
+                                <p class="text-indigo-100">Comprehensive guides, API references, and examples</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <span class="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm">
+                                {{ documentationFiles.length }} Files
+                            </span>
+                            <span class="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm">
+                                {{ documentationFiles.filter(f => isImageFile(f)).length }} Images
+                            </span>
+                            <span class="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm">
+                                {{ documentationFiles.filter(f => f.name?.endsWith('.pdf')).length }} PDFs
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- SDK Download Section -->
+                    <div v-if="tool.sdk_download_url" class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">SDK Download</h3>
+                        <a :href="tool.sdk_download_url"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                            Download SDK
+                        </a>
+                    </div>
+
+                    <!-- Documentation Files Grid -->
+                    <div v-if="documentationFiles.length > 0" class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-6">Documentation Files</h3>
+
+                        <!-- Files Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div v-for="(file, index) in documentationFiles" :key="index"
+                                 class="border rounded-lg p-4 hover:shadow-md transition group">
+                                <div class="flex items-start gap-3">
+                                    <span class="text-3xl">{{ getFileIcon(file.name, file.type) }}</span>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="font-medium text-gray-900 truncate" :title="file.name">
+                                            {{ file.name }}
+                                        </p>
+                                        <p class="text-sm text-gray-500">{{ formatFileSize(file.size) }}</p>
+
+                                        <!-- File Type Badge -->
+                                        <span class="inline-block mt-2 text-xs bg-gray-100 px-2 py-1 rounded">
+                                            {{ file.name?.split('.').pop()?.toUpperCase() || 'FILE' }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="flex gap-2 mt-4 pt-3 border-t border-gray-100">
+                                    <button @click="previewFile(file)"
+                                            class="flex-1 flex items-center justify-center px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition text-sm">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                        </svg>
+                                        Preview
+                                    </button>
+                                    <button @click="downloadFile(file)"
+                                            class="flex-1 flex items-center justify-center px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition text-sm">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                        </svg>
+                                        Download
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- External Documentation Link -->
+                    <div v-if="tool.metadata?.documentation_url" class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">External Documentation</h3>
+                        <a :href="tool.metadata.documentation_url"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                            </svg>
+                            Visit Documentation Website
+                        </a>
+                    </div>
+
+                    <!-- No Documentation Message -->
+                    <div v-if="!tool.sdk_download_url && !documentationFiles.length && !tool.metadata?.documentation_url"
+                         class="bg-gray-50 rounded-lg p-12 text-center">
+                        <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                        </svg>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">No Documentation Available</h3>
+                        <p class="text-gray-500">Check back later for documentation and guides.</p>
                     </div>
                 </div>
 
@@ -559,13 +922,12 @@ const stats = computed(() => {
                                 </ul>
 
                                 <!-- CTA Button -->
-                                <button @click="selectPlan(plan)"
-                                        :class="['mt-6 w-full py-2 px-4 rounded-lg text-sm font-medium transition',
-                                                 plan.is_popular
-                                                     ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                                                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200']">
-                                    Get Started
-                                </button>
+                            <Link v-if="plan.billing_cycle !== 'lifetime' || plan.billing_cycle !== 'one_time'"
+                                :href="route('plans.show', plan.id)"
+                                class="block text-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition"
+                                :class="{ 'bg-indigo-600': plan.is_popular }">
+                                View Plan
+                            </Link>
                             </div>
                         </div>
                     </div>
@@ -643,114 +1005,88 @@ const stats = computed(() => {
             </div>
         </div>
 
-        <!-- Subscribe Modal -->
-        <div v-if="showPlanModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <!-- File Preview Modal -->
+        <div v-if="showFilePreview && selectedFile" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <!-- Background overlay -->
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showPlanModal = false"></div>
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closePreview"></div>
 
-                <!-- Modal panel -->
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div class="sm:flex sm:items-start">
                             <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
-                                <!-- Modal Header -->
-                                <div class="flex justify-between items-start mb-6">
-                                    <div>
-                                        <h3 class="text-2xl font-bold text-gray-900" id="modal-title">
-                                            Subscribe to {{ selectedPlan?.name }}
-                                        </h3>
-                                        <p class="text-sm text-gray-500 mt-1">{{ tool.name }}</p>
-                                    </div>
-                                    <button @click="showPlanModal = false" class="text-gray-400 hover:text-gray-500">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                        {{ selectedFile.name }}
+                                    </h3>
+                                    <button @click="closePreview" class="text-gray-400 hover:text-gray-500">
                                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                         </svg>
                                     </button>
                                 </div>
 
-                                <!-- Plan Summary -->
-                                <div class="bg-indigo-50 rounded-lg p-4 mb-6">
-                                    <div class="flex justify-between items-center">
-                                        <div>
-                                            <span class="text-sm text-indigo-600 font-medium">Selected Plan</span>
-                                            <p class="text-lg font-bold text-gray-900">{{ selectedPlan?.name }}</p>
-                                        </div>
-                                        <div class="text-right">
-                                            <span class="text-2xl font-bold text-indigo-600">
-                                                {{ formatCurrency(selectedPlan?.price, selectedPlan?.currency) }}
-                                            </span>
-                                            <span class="text-sm text-gray-500">/{{ selectedPlan?.billing_cycle }}</span>
-                                        </div>
+                                <!-- Image Preview -->
+                                <div v-if="isImageFile(selectedFile)" class="flex justify-center">
+                                    <img :src="selectedFile.content || selectedFile.url"
+                                         :alt="selectedFile.name"
+                                         class="max-w-full max-h-[70vh] object-contain rounded-lg" />
+                                </div>
+
+                                <!-- Text File Preview with loading and error states -->
+                                <div v-else-if="isTextFile(selectedFile)" class="bg-gray-50 p-4 rounded-lg max-h-[70vh] overflow-auto">
+                                    <!-- Loading State -->
+                                    <div v-if="previewLoading" class="text-center py-8">
+                                        <svg class="mx-auto h-12 w-12 text-indigo-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <p class="mt-2 text-gray-500">Loading content...</p>
+                                    </div>
+
+                                    <!-- Error State -->
+                                    <div v-else-if="previewError" class="text-center py-8">
+                                        <svg class="mx-auto h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        <p class="mt-2 text-red-600">{{ previewError }}</p>
+                                        <p class="text-sm text-gray-500 mt-1">You can download the file instead</p>
+                                    </div>
+
+                                    <!-- Content -->
+                                    <pre v-else-if="textContent" class="text-sm text-gray-800 whitespace-pre-wrap font-mono">{{ textContent }}</pre>
+
+                                    <!-- No Content -->
+                                    <div v-else class="text-center py-8">
+                                        <p class="text-gray-500">No content available</p>
                                     </div>
                                 </div>
 
-                                <!-- Billing Cycle -->
-                                <div class="mb-6">
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Billing Cycle</label>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <button @click="form.billing_cycle = 'monthly'"
-                                                :class="['px-4 py-2 text-sm font-medium rounded-lg border transition',
-                                                         form.billing_cycle === 'monthly'
-                                                             ? 'bg-indigo-600 text-white border-indigo-600'
-                                                             : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50']">
-                                            Monthly
-                                        </button>
-                                        <button @click="form.billing_cycle = 'yearly'"
-                                                :class="['px-4 py-2 text-sm font-medium rounded-lg border transition relative',
-                                                         form.billing_cycle === 'yearly'
-                                                             ? 'bg-indigo-600 text-white border-indigo-600'
-                                                             : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50']">
-                                            Yearly
-                                            <span class="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                                                Save 20%
-                                            </span>
-                                        </button>
-                                    </div>
+                                <!-- PDF Preview (using iframe) -->
+                                <div v-else-if="selectedFile.name?.endsWith('.pdf')" class="h-[70vh]">
+                                    <iframe :src="selectedFile.content || selectedFile.url"
+                                            class="w-full h-full rounded-lg"
+                                            frameborder="0">
+                                    </iframe>
                                 </div>
 
-                                <!-- Features Summary -->
-                                <div class="mb-6">
-                                    <h4 class="text-sm font-medium text-gray-900 mb-3">What's included:</h4>
-                                    <ul class="space-y-2">
-                                        <li class="flex items-center text-sm text-gray-600">
-                                            <svg class="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                            </svg>
-                                            {{ selectedPlan?.api_call_limit?.toLocaleString() || 'Unlimited' }} API calls per month
-                                        </li>
-                                        <li class="flex items-center text-sm text-gray-600">
-                                            <svg class="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                            </svg>
-                                            {{ selectedPlan?.device_limit || 'Unlimited' }} connected devices
-                                        </li>
-                                        <li class="flex items-center text-sm text-gray-600">
-                                            <svg class="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                            </svg>
-                                            Priority email support
-                                        </li>
-                                    </ul>
+                                <!-- Other File Types -->
+                                <div v-else class="text-center py-12">
+                                    <span class="text-6xl block mb-4">{{ getFileIcon(selectedFile.name, selectedFile.type) }}</span>
+                                    <p class="text-gray-500 mb-4">Preview not available for this file type</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Modal Footer -->
-                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
-                        <button @click="subscribe"
-                                :disabled="form.processing"
-                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50">
-                            <svg v-if="form.processing" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Confirm Subscription
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button @click="downloadFile(selectedFile)"
+                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 sm:ml-3 sm:w-auto sm:text-sm">
+                            Download
                         </button>
-                        <button @click="showPlanModal = false"
-                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                            Cancel
+                        <button @click="closePreview"
+                                type="button"
+                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:w-auto sm:text-sm">
+                            Close
                         </button>
                     </div>
                 </div>

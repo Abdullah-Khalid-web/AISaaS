@@ -7,10 +7,6 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 
 const props = defineProps({
-    isGuest: {
-        type: Boolean,
-        default: false
-    },
     showSidebar: {
         type: Boolean,
         default: true
@@ -22,6 +18,11 @@ const emit = defineEmits(['toggle-sidebar']);
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
 const showingNavigationDropdown = ref(false);
+
+// Determine if user is authenticated - THIS IS THE KEY FIX
+const isAuthenticated = computed(() => {
+    return user.value !== null && user.value !== undefined;
+});
 
 // Check if routes exist
 const hasBillingRoute = computed(() => {
@@ -39,9 +40,9 @@ const hasApiTokensRoute = computed(() => {
             <div class="flex justify-between items-center h-16">
                 <!-- Left section with mobile menu button -->
                 <div class="flex items-center">
-                    <!-- Mobile menu button (only visible when not guest and on mobile) -->
+                    <!-- Mobile menu button (only visible when authenticated and on mobile) -->
                     <button
-                        v-if="!isGuest"
+                        v-if="isAuthenticated"
                         @click="emit('toggle-sidebar')"
                         class="md:hidden mr-4 text-gray-500 hover:text-gray-700 focus:outline-none"
                     >
@@ -50,13 +51,13 @@ const hasApiTokensRoute = computed(() => {
                         </svg>
                     </button>
 
-                    <!-- Logo -->
-                    <Link :href="isGuest ? '/' : '/dashboard'" class="flex items-center">
+                    <!-- Logo - different home links based on auth status -->
+                    <Link :href="isAuthenticated ? '/dashboard' : '/'" class="flex items-center">
                         <span class="text-2xl font-bold text-indigo-600">AI<span class="text-gray-800">Tool</span></span>
                     </Link>
                 </div>
 
-                <!-- Desktop Navigation -->
+                <!-- Desktop Navigation - Always show these links regardless of auth status -->
                 <nav class="hidden md:flex space-x-8">
                     <Link href="/" class="text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium">Home</Link>
                     <Link href="/features" class="text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium">Features</Link>
@@ -65,9 +66,10 @@ const hasApiTokensRoute = computed(() => {
                     <Link href="/contact" class="text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium">Contact</Link>
                 </nav>
 
-                <!-- Auth Buttons or User Menu -->
+                <!-- Auth Buttons or User Menu - Based on ACTUAL authentication status -->
                 <div class="hidden md:flex items-center space-x-4">
-                    <template v-if="isGuest || !user">
+                    <template v-if="!isAuthenticated">
+                        <!-- Guest User - Show Login/Register -->
                         <Link href="/login" class="text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium">
                             Login
                         </Link>
@@ -76,6 +78,7 @@ const hasApiTokensRoute = computed(() => {
                         </Link>
                     </template>
                     <template v-else>
+                        <!-- Authenticated User - Show User Menu -->
                         <span class="text-sm text-gray-600">{{ user?.email }}</span>
                         <Dropdown align="right" width="48">
                             <template #trigger>
@@ -126,7 +129,8 @@ const hasApiTokensRoute = computed(() => {
                 <ResponsiveNavLink href="/contact">Contact</ResponsiveNavLink>
             </div>
 
-            <template v-if="isGuest || !user">
+            <!-- Mobile menu based on ACTUAL authentication status -->
+            <template v-if="!isAuthenticated">
                 <div class="pt-4 pb-1 border-t border-gray-200">
                     <div class="mt-3 space-y-1">
                         <ResponsiveNavLink href="/login">Login</ResponsiveNavLink>

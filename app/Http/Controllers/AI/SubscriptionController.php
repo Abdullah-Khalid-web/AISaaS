@@ -131,11 +131,18 @@ class SubscriptionController extends Controller
             ];
         }
 
+        // return Inertia::render('Subscriptions/Index', [
+        //     'licenses' => $licenses,
+        //     'filters' => $request->only(['search', 'status', 'tool_id']),
+        //     'tools' => $tools,
+        //     'stats' => $stats
+        // ]);
         return Inertia::render('Subscriptions/Index', [
             'licenses' => $licenses,
             'filters' => $request->only(['search', 'status', 'tool_id']),
             'tools' => $tools,
-            'stats' => $stats
+            'stats' => $stats,
+            'isAdmin' => $isAdmin // Add this line
         ]);
     }
 
@@ -227,7 +234,13 @@ class SubscriptionController extends Controller
             }
 
             // Generate license key
-            $licenseKey = 'LIC-' . strtoupper(uniqid()) . '-' . str_pad(Auth::id(), 4, '0', STR_PAD_LEFT);
+            // $licenseKey = 'LIC-' . strtoupper(uniqid()) . '-' . str_pad(Auth::id(), 4, '0', STR_PAD_LEFT);
+            $licenseKey = strtoupper(
+                substr($tool->name, 0, 3) . '-' .
+                substr($plan->name, 0, 3) . '-' .
+                strtoupper(Str::random(8)) . '-' .
+                str_pad(Auth::id(), 4, '0', STR_PAD_LEFT)
+            );
 
             // Create license
             $license = License::create([
@@ -683,6 +696,32 @@ class SubscriptionController extends Controller
                 })
             ]
         ]);
+    }
+
+    // In your SubscriptionController.php
+    public function updateStatus(Request $request, License $license)
+    {
+        // Check authorization
+        if (!Auth::user()->hasAnyRole(['admin', 'super-admin'])) {
+            abort(403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:active,pending,expired,cancelled,suspended'
+        ]);
+
+        DB::transaction(function () use ($request, $license) {
+            $license->update([
+                'status' => $request->status,
+                'metadata' => array_merge($license->metadata ?? [], [
+                    'status_updated_at' => now()->toDateTimeString(),
+                    'status_updated_by' => Auth::id(),
+                    'previous_status' => $license->status
+                ])
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Subscription status updated successfully.');
     }
 
 }

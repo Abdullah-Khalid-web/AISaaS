@@ -1,7 +1,6 @@
 <!-- resources/js/Pages/Licenses/Show.vue -->
 <script setup>
-import AdminLayout from '@/Layouts/AppLayout.vue';
-import GuestLayout from '@/Layouts/GuestLayout.vue';
+import AppLayout from '@/Layouts/AppLayout.vue'; // Changed from AdminLayout to AppLayout
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
@@ -16,8 +15,8 @@ const props = defineProps({
     }
 });
 
-// Use appropriate layout
-const layout = props.isAdmin ? AdminLayout : GuestLayout;
+// Always use AppLayout - licenses require authentication
+const layout = AppLayout;
 
 // State
 const showRenewModal = ref(false);
@@ -93,7 +92,8 @@ const processRevoke = () => {
 // Copy to clipboard
 const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    // Show toast notification (you can implement this)
+    // You could add a toast notification here
+    alert('License key copied to clipboard!');
 };
 </script>
 
@@ -102,274 +102,274 @@ const copyToClipboard = (text) => {
         <Head :title="'License: ' + license.license_key" />
 
         <!-- Header -->
-        <div class="bg-white shadow">
-            <div class="px-4 sm:px-6 lg:px-8 py-6">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <Link :href="route('subscriptions.index')" class="text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
-                            ← Back to Subscriptions
-                        </Link>
-                        <h1 class="text-2xl font-semibold text-gray-900">License Details</h1>
-                    </div>
-                    <div class="flex space-x-3">
-                        <button v-if="license.status === 'active'"
-                                @click="showRenewModal = true"
-                                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                            Renew License
-                        </button>
-                        <button v-if="license.status === 'active'"
-                                @click="showRevokeModal = true"
-                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                            Revoke License
-                        </button>
-                    </div>
+        <template #header>
+            <div class="flex justify-between items-center">
+                <div>
+                    <Link :href="route('subscriptions.index')" class="text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
+                        ← Back to Subscriptions
+                    </Link>
+                    <h2 class="text-xl font-semibold leading-tight text-gray-800">License Details</h2>
+                </div>
+                <div class="flex space-x-3">
+                    <button v-if="license.status === 'active'"
+                            @click="showRenewModal = true"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        Renew License
+                    </button>
+                    <button v-if="license.status === 'active' && (isAdmin || license.user_id === $page.props.auth.user?.id)"
+                            @click="showRevokeModal = true"
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                        Revoke License
+                    </button>
                 </div>
             </div>
-        </div>
+        </template>
 
         <!-- Main Content -->
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <!-- License Key Card -->
-            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-lg p-6 mb-8 text-white">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <p class="text-indigo-200 text-sm mb-1">License Key</p>
-                        <div class="flex items-center space-x-2">
-                            <code class="text-2xl font-mono bg-white bg-opacity-20 px-4 py-2 rounded-lg">
-                                {{ license.license_key }}
-                            </code>
-                            <button @click="copyToClipboard(license.license_key)"
-                                    class="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
-                                </svg>
-                            </button>
+        <div class="py-6">
+            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <!-- License Key Card -->
+                <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-lg p-6 mb-8 text-white">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-indigo-200 text-sm mb-1">License Key</p>
+                            <div class="flex items-center space-x-2">
+                                <code class="text-2xl font-mono bg-white bg-opacity-20 px-4 py-2 rounded-lg">
+                                    {{ license.license_key }}
+                                </code>
+                                <button @click="copyToClipboard(license.license_key)"
+                                        class="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
+                        <span :class="['px-3 py-1 rounded-full text-sm font-medium', getStatusBadgeClass(license.status)]">
+                            {{ license.status.toUpperCase() }}
+                        </span>
                     </div>
-                    <span :class="['px-3 py-1 rounded-full text-sm font-medium', getStatusBadgeClass(license.status)]">
-                        {{ license.status.toUpperCase() }}
-                    </span>
+                    <p class="text-indigo-200 text-sm mt-4">
+                        Package: <span class="font-mono">{{ license.package_name }}</span>
+                    </p>
                 </div>
-                <p class="text-indigo-200 text-sm mt-4">
-                    Package: <span class="font-mono">{{ license.package_name }}</span>
-                </p>
-            </div>
 
-            <!-- Tabs -->
-            <div class="border-b border-gray-200 mb-6">
-                <nav class="flex space-x-8">
-                    <button @click="activeTab = 'details'"
-                            :class="['pb-4 px-1 border-b-2 font-medium text-sm',
-                                     activeTab === 'details' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
-                        Details
-                    </button>
-                    <button @click="activeTab = 'usage'"
-                            :class="['pb-4 px-1 border-b-2 font-medium text-sm',
-                                     activeTab === 'usage' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
-                        Usage & Analytics
-                    </button>
-                    <button @click="activeTab = 'devices'"
-                            :class="['pb-4 px-1 border-b-2 font-medium text-sm',
-                                     activeTab === 'devices' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
-                        Devices
-                    </button>
-                    <button @click="activeTab = 'payments'"
-                            :class="['pb-4 px-1 border-b-2 font-medium text-sm',
-                                     activeTab === 'payments' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
-                        Payment History
-                    </button>
-                </nav>
-            </div>
+                <!-- Tabs -->
+                <div class="border-b border-gray-200 mb-6">
+                    <nav class="flex space-x-8">
+                        <button @click="activeTab = 'details'"
+                                :class="['pb-4 px-1 border-b-2 font-medium text-sm',
+                                         activeTab === 'details' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                            Details
+                        </button>
+                        <button @click="activeTab = 'usage'"
+                                :class="['pb-4 px-1 border-b-2 font-medium text-sm',
+                                         activeTab === 'usage' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                            Usage & Analytics
+                        </button>
+                        <button @click="activeTab = 'devices'"
+                                :class="['pb-4 px-1 border-b-2 font-medium text-sm',
+                                         activeTab === 'devices' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                            Devices
+                        </button>
+                        <button @click="activeTab = 'payments'"
+                                :class="['pb-4 px-1 border-b-2 font-medium text-sm',
+                                         activeTab === 'payments' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                            Payment History
+                        </button>
+                    </nav>
+                </div>
 
-            <!-- Tab Content -->
-            <div class="min-h-[400px]">
-                <!-- Details Tab -->
-                <div v-if="activeTab === 'details'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- License Information -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">License Information</h3>
-                        <dl class="space-y-3">
-                            <div class="flex justify-between">
-                                <dt class="text-gray-500">Status</dt>
-                                <dd>
-                                    <span :class="['px-2 py-1 text-xs rounded-full', getStatusBadgeClass(license.status)]">
-                                        {{ license.status }}
-                                    </span>
-                                </dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-500">Created</dt>
-                                <dd class="font-medium">{{ formatDate(license.created_at) }}</dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-500">Expires</dt>
-                                <dd class="font-medium" :class="license.isExpired ? 'text-red-600' : 'text-green-600'">
-                                    {{ formatDate(license.expires_at) }}
-                                </dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-500">Auto-renew</dt>
-                                <dd class="font-medium">
-                                    <span :class="license.auto_renew ? 'text-green-600' : 'text-gray-600'">
-                                        {{ license.auto_renew ? 'Enabled' : 'Disabled' }}
-                                    </span>
-                                </dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-500">Trial</dt>
-                                <dd class="font-medium">{{ license.is_trial ? 'Yes' : 'No' }}</dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                    <!-- Tool Information -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Tool Information</h3>
-                        <div class="flex items-center mb-4">
-                            <span class="text-4xl mr-3">{{ license.tool?.metadata?.icon || '🤖' }}</span>
-                            <div>
-                                <p class="text-xl font-bold text-gray-900">{{ license.tool?.name }}</p>
-                                <p class="text-sm text-gray-500">v{{ license.tool?.version || '1.0' }}</p>
-                            </div>
-                        </div>
-                        <dl class="space-y-3">
-                            <div class="flex justify-between">
-                                <dt class="text-gray-500">Plan</dt>
-                                <dd class="font-medium">{{ license.plan?.name }}</dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-500">Billing Cycle</dt>
-                                <dd class="font-medium">{{ license.plan?.billing_cycle }}</dd>
-                            </div>
-                            <div class="flex justify-between">
-                                <dt class="text-gray-500">Price</dt>
-                                <dd class="font-medium">{{ formatCurrency(license.plan?.price, license.plan?.currency) }}</dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                    <!-- Limits -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Usage Limits</h3>
-                        <div class="space-y-4">
-                            <div>
-                                <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-gray-600">API Calls</span>
-                                    <span class="font-medium">{{ license.api_calls_used?.toLocaleString() }} / {{ license.api_calls_limit?.toLocaleString() || '∞' }}</span>
+                <!-- Tab Content (keep the rest of your content exactly as is) -->
+                <div class="min-h-[400px]">
+                    <!-- Details Tab -->
+                    <div v-if="activeTab === 'details'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- License Information -->
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">License Information</h3>
+                            <dl class="space-y-3">
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-500">Status</dt>
+                                    <dd>
+                                        <span :class="['px-2 py-1 text-xs rounded-full', getStatusBadgeClass(license.status)]">
+                                            {{ license.status }}
+                                        </span>
+                                    </dd>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-indigo-600 h-2 rounded-full"
-                                         :style="{ width: (license.api_calls_used / license.api_calls_limit * 100) + '%' }"></div>
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-500">Created</dt>
+                                    <dd class="font-medium">{{ formatDate(license.created_at) }}</dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-500">Expires</dt>
+                                    <dd class="font-medium" :class="license.isExpired ? 'text-red-600' : 'text-green-600'">
+                                        {{ formatDate(license.expires_at) }}
+                                    </dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-500">Auto-renew</dt>
+                                    <dd class="font-medium">
+                                        <span :class="license.auto_renew ? 'text-green-600' : 'text-gray-600'">
+                                            {{ license.auto_renew ? 'Enabled' : 'Disabled' }}
+                                        </span>
+                                    </dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-500">Trial</dt>
+                                    <dd class="font-medium">{{ license.is_trial ? 'Yes' : 'No' }}</dd>
+                                </div>
+                            </dl>
+                        </div>
+
+                        <!-- Tool Information -->
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Tool Information</h3>
+                            <div class="flex items-center mb-4">
+                                <span class="text-4xl mr-3">{{ license.tool?.metadata?.icon || '🤖' }}</span>
+                                <div>
+                                    <p class="text-xl font-bold text-gray-900">{{ license.tool?.name }}</p>
+                                    <p class="text-sm text-gray-500">v{{ license.tool?.version || '1.0' }}</p>
                                 </div>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Device Limit</span>
-                                <span class="font-medium">{{ license.device_count || 0 }} / {{ license.device_limit || '∞' }}</span>
+                            <dl class="space-y-3">
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-500">Plan</dt>
+                                    <dd class="font-medium">{{ license.plan?.name }}</dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-500">Billing Cycle</dt>
+                                    <dd class="font-medium">{{ license.plan?.billing_cycle }}</dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-gray-500">Price</dt>
+                                    <dd class="font-medium">{{ formatCurrency(license.plan?.price, license.plan?.currency) }}</dd>
+                                </div>
+                            </dl>
+                        </div>
+
+                        <!-- Limits -->
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Usage Limits</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="text-gray-600">API Calls</span>
+                                        <span class="font-medium">{{ license.api_calls_used?.toLocaleString() }} / {{ license.api_calls_limit?.toLocaleString() || '∞' }}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-indigo-600 h-2 rounded-full"
+                                             :style="{ width: Math.min((license.api_calls_used / license.api_calls_limit * 100), 100) + '%' }"></div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Device Limit</span>
+                                    <span class="font-medium">{{ license.device_count || 0 }} / {{ license.device_limit || '∞' }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Domains Allowed</span>
+                                    <span class="font-medium">{{ license.allowed_domains?.length || 0 }}</span>
+                                </div>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Domains Allowed</span>
-                                <span class="font-medium">{{ license.allowed_domains?.length || 0 }}</span>
+                        </div>
+
+                        <!-- Metadata -->
+                        <div v-if="license.metadata" class="bg-white rounded-lg shadow p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
+                            <dl class="space-y-2">
+                                <div v-for="(value, key) in license.metadata" :key="key" class="flex justify-between">
+                                    <dt class="text-gray-500 capitalize">{{ key.replace('_', ' ') }}</dt>
+                                    <dd class="font-medium text-sm">{{ value }}</dd>
+                                </div>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <!-- Usage Tab -->
+                    <div v-if="activeTab === 'usage'" class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">API Usage Analytics</h3>
+
+                        <!-- Usage Chart Placeholder -->
+                        <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center mb-6">
+                            <svg class="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
+                                <polyline points="0,150 50,120 100,80 150,100 200,60 250,90 300,40 350,70 400,30"
+                                          stroke="#4F46E5" stroke-width="2" fill="none"/>
+                                <polygon points="0,150 0,200 400,200 400,30 350,70 300,40 250,90 200,60 150,100 100,80 50,120 0,150"
+                                         fill="#4F46E5" fill-opacity="0.1"/>
+                            </svg>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="text-center p-4 bg-indigo-50 rounded-lg">
+                                <p class="text-sm text-gray-600">Today</p>
+                                <p class="text-2xl font-bold text-indigo-600">1,234</p>
+                            </div>
+                            <div class="text-center p-4 bg-indigo-50 rounded-lg">
+                                <p class="text-sm text-gray-600">This Week</p>
+                                <p class="text-2xl font-bold text-indigo-600">8,901</p>
+                            </div>
+                            <div class="text-center p-4 bg-indigo-50 rounded-lg">
+                                <p class="text-sm text-gray-600">This Month</p>
+                                <p class="text-2xl font-bold text-indigo-600">45,678</p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Metadata -->
-                    <div v-if="license.metadata" class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
-                        <dl class="space-y-2">
-                            <div v-for="(value, key) in license.metadata" :key="key" class="flex justify-between">
-                                <dt class="text-gray-500 capitalize">{{ key.replace('_', ' ') }}</dt>
-                                <dd class="font-medium text-sm">{{ value }}</dd>
+                    <!-- Devices Tab -->
+                    <div v-if="activeTab === 'devices'" class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Registered Devices</h3>
+
+                        <div v-if="license.device_ids?.length" class="space-y-3">
+                            <div v-for="(device, index) in license.device_ids" :key="index"
+                                 class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                    </svg>
+                                    <span class="font-mono text-sm">{{ device }}</span>
+                                </div>
+                                <span class="text-xs text-gray-500">Active</span>
                             </div>
-                        </dl>
-                    </div>
-                </div>
-
-                <!-- Usage Tab -->
-                <div v-if="activeTab === 'usage'" class="bg-white rounded-lg shadow p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">API Usage Analytics</h3>
-
-                    <!-- Usage Chart Placeholder -->
-                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center mb-6">
-                        <svg class="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
-                            <polyline points="0,150 50,120 100,80 150,100 200,60 250,90 300,40 350,70 400,30"
-                                      stroke="#4F46E5" stroke-width="2" fill="none"/>
-                            <polygon points="0,150 0,200 400,200 400,30 350,70 300,40 250,90 200,60 150,100 100,80 50,120 0,150"
-                                     fill="#4F46E5" fill-opacity="0.1"/>
-                        </svg>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="text-center p-4 bg-indigo-50 rounded-lg">
-                            <p class="text-sm text-gray-600">Today</p>
-                            <p class="text-2xl font-bold text-indigo-600">1,234</p>
                         </div>
-                        <div class="text-center p-4 bg-indigo-50 rounded-lg">
-                            <p class="text-sm text-gray-600">This Week</p>
-                            <p class="text-2xl font-bold text-indigo-600">8,901</p>
-                        </div>
-                        <div class="text-center p-4 bg-indigo-50 rounded-lg">
-                            <p class="text-sm text-gray-600">This Month</p>
-                            <p class="text-2xl font-bold text-indigo-600">45,678</p>
+                        <div v-else class="text-center py-8 text-gray-500">
+                            No devices registered yet
                         </div>
                     </div>
-                </div>
 
-                <!-- Devices Tab -->
-                <div v-if="activeTab === 'devices'" class="bg-white rounded-lg shadow p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Registered Devices</h3>
-
-                    <div v-if="license.device_ids?.length" class="space-y-3">
-                        <div v-for="(device, index) in license.device_ids" :key="index"
-                             class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div class="flex items-center">
-                                <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                </svg>
-                                <span class="font-mono text-sm">{{ device }}</span>
-                            </div>
-                            <span class="text-xs text-gray-500">Active</span>
-                        </div>
+                    <!-- Payments Tab -->
+                    <div v-if="activeTab === 'payments'" class="bg-white rounded-lg shadow overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr v-for="payment in license.payments" :key="payment.id">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ formatDate(payment.paid_at) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
+                                        {{ payment.transaction_id }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ formatCurrency(payment.amount, payment.currency) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ payment.payment_method }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                                            {{ payment.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div v-else class="text-center py-8 text-gray-500">
-                        No devices registered yet
-                    </div>
-                </div>
-
-                <!-- Payments Tab -->
-                <div v-if="activeTab === 'payments'" class="bg-white rounded-lg shadow overflow-hidden">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <tr v-for="payment in license.payments" :key="payment.id">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {{ formatDate(payment.paid_at) }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
-                                    {{ payment.transaction_id }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {{ formatCurrency(payment.amount, payment.currency) }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {{ payment.payment_method }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                                        {{ payment.status }}
-                                    </span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
                 </div>
             </div>
         </div>

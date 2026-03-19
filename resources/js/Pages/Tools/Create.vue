@@ -13,7 +13,7 @@ const form = useForm({
     metadata: {
         icon: '🤖',
         features: [],
-        documentation_url: '',
+        documentation_files: [], // Keep this for file uploads
         color: '#4f46e5'
     },
     is_active: true,
@@ -36,6 +36,12 @@ const iconOptions = [
 
 const featureInput = ref('');
 const showAdvanced = ref(false);
+
+// File upload refs
+const documentationFiles = ref([]);
+const uploadError = ref('');
+const isDragging = ref(false);
+const fileInputRef = ref(null);
 
 const addFeature = () => {
     if (featureInput.value.trim()) {
@@ -60,7 +66,101 @@ const togglePlatform = (platform) => {
     }
 };
 
+// File upload handlers
+const handleFileUpload = (event) => {
+    const files = Array.from(event.target.files);
+    processFiles(files);
+};
+
+const handleDrop = (event) => {
+    event.preventDefault();
+    isDragging.value = false;
+
+    const files = Array.from(event.dataTransfer.files);
+    processFiles(files);
+};
+
+const processFiles = (files) => {
+    uploadError.value = '';
+
+    // Validate file types (you can customize this)
+    const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain',
+        'text/markdown',
+        'application/json',
+        'text/html',
+        'text/css',
+        'application/javascript',
+        'image/jpeg',
+        'image/png',
+        'image/svg+xml'
+    ];
+
+    const validFiles = files.filter(file => {
+        if (!allowedTypes.includes(file.type) && !file.name.match(/\.(md|txt|json|html|css|js|py|java|cpp|php|sql|rtf)$/i)) {
+            uploadError.value = `File type not allowed: ${file.name}`;
+            return false;
+        }
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            uploadError.value = `File too large (max 10MB): ${file.name}`;
+            return false;
+        }
+        return true;
+    });
+
+    validFiles.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const fileData = {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                lastModified: file.lastModified,
+                content: e.target.result, // Base64 content
+                url: URL.createObjectURL(file) // Temporary URL for preview
+            };
+
+            if (!form.metadata.documentation_files) {
+                form.metadata.documentation_files = [];
+            }
+            form.metadata.documentation_files.push(fileData);
+            documentationFiles.value.push(fileData);
+        };
+        reader.readAsDataURL(file);
+    });
+};
+
+const removeFile = (index) => {
+    const file = form.metadata.documentation_files[index];
+    if (file.url && file.url.startsWith('blob:')) {
+        URL.revokeObjectURL(file.url);
+    }
+    form.metadata.documentation_files.splice(index, 1);
+    documentationFiles.value.splice(index, 1);
+};
+
+const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
 const submit = () => {
+    // Clean up blob URLs before submit
+    if (form.metadata.documentation_files) {
+        form.metadata.documentation_files.forEach(file => {
+            if (file.url && file.url.startsWith('blob:')) {
+                URL.revokeObjectURL(file.url);
+                delete file.url; // Remove temporary URL before submit
+            }
+        });
+    }
+
     form.post(route('tools.store'), {
         preserveScroll: true,
         onSuccess: () => {
@@ -263,17 +363,93 @@ const cancel = () => {
                                     <p class="mt-1 text-xs text-gray-500">Optional: Link to download the SDK</p>
                                 </div>
 
-                                <!-- Documentation URL -->
+                                <!-- Documentation Files Upload -->
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        Documentation URL
+                                        Documentation Files
                                     </label>
-                                    <input
-                                        type="url"
-                                        v-model="form.metadata.documentation_url"
-                                        class="w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                                        placeholder="https://docs.example.com"
-                                    />
+
+                                    <!-- Drop zone -->
+                                    <div
+                                        class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition"
+                                        :class="[
+                                            isDragging ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300 hover:border-gray-400',
+                                            uploadError ? 'border-red-300 bg-red-50' : ''
+                                        ]"
+                                        @dragenter.prevent="isDragging = true"
+                                        @dragover.prevent="isDragging = true"
+                                        @dragleave.prevent="isDragging = false"
+                                        @drop.prevent="handleDrop"
+                                        @click="fileInputRef.click()"
+                                    >
+                                        <input
+                                            ref="fileInputRef"
+                                            type="file"
+                                            multiple
+                                            class="hidden"
+                                            @change="handleFileUpload"
+                                            accept=".pdf,.doc,.docx,.txt,.md,.json,.html,.css,.js,.py,.java,.cpp,.php,.sql,.rtf,.jpg,.jpeg,.png,.gif,.svg"
+                                        />
+
+                                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                        </svg>
+
+                                        <p class="mt-2 text-sm text-gray-600">
+                                            <span class="font-medium text-indigo-600">Click to upload</span> or drag and drop
+                                        </p>
+                                        <p class="mt-1 text-xs text-gray-500">
+                                            PDF, DOC, DOCX, TXT, MD, JSON, HTML, CSS, JS, images (up to 10MB each)
+                                        </p>
+                                    </div>
+
+                                    <p v-if="uploadError" class="mt-2 text-sm text-red-600">{{ uploadError }}</p>
+
+                                    <!-- File list -->
+                                    <div v-if="form.metadata.documentation_files && form.metadata.documentation_files.length > 0" class="mt-4 space-y-2">
+                                        <div
+                                            v-for="(file, index) in form.metadata.documentation_files"
+                                            :key="index"
+                                            class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                                        >
+                                            <div class="flex items-center gap-3">
+                                                <!-- File icon based on type -->
+                                                <span class="text-2xl">
+                                                    {{ file.type?.includes('pdf') ? '📕' :
+                                                       file.type?.includes('word') ? '📘' :
+                                                       file.type?.includes('text') ? '📃' :
+                                                       file.type?.includes('image') ? '🖼️' : '📄' }}
+                                                </span>
+                                                <div>
+                                                    <p class="text-sm font-medium text-gray-900">{{ file.name }}</p>
+                                                    <p class="text-xs text-gray-500">{{ formatFileSize(file.size) }}</p>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <!-- Preview link if applicable -->
+                                                <a
+                                                    v-if="file.url && file.type?.startsWith('image/')"
+                                                    :href="file.url"
+                                                    target="_blank"
+                                                    class="text-indigo-600 hover:text-indigo-900"
+                                                >
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                    </svg>
+                                                </a>
+                                                <button
+                                                    type="button"
+                                                    @click="removeFile(index)"
+                                                    class="text-red-600 hover:text-red-900"
+                                                >
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

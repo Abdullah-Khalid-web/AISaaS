@@ -64,10 +64,11 @@ const props = defineProps({
                                     {{ feature }}
                                 </li>
                             </ul>
-
-                            <Link :href="route('register')"
-                                  class="block text-center bg-indigo-600 text-white px-4 py-3 rounded-md hover:bg-indigo-700 transition">
-                                Get Started
+                            <Link v-if="plan.billing_cycle !== 'lifetime' || plan.billing_cycle !== 'one_time'"
+                                :href="route('plans.show', plan.id)"
+                                class="block text-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition"
+                                :class="{ 'bg-indigo-600': plan.is_popular }">
+                                View Plan
                             </Link>
                         </div>
                     </div>
